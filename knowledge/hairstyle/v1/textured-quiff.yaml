@@ -1,0 +1,155 @@
+haircut:
+  id: textured-quiff
+  name: Textured Quiff
+  family: quiff
+
+  description:
+    short: >
+      A quiff-style haircut with visible texture and volume concentrated
+      through the top and front of the hair.
+    barber_summary: >
+      Keep enough length through the top and front to create volume and
+      texture, while keeping the sides and back cleaner and more controlled.
+
+  geometry:
+    top:
+      length: medium
+      volume: high
+      direction: mixed
+
+    sides:
+      length: short
+      treatment: tapered_or_shorter_than_top
+
+    back:
+      length: short
+      treatment: tapered_or_shorter_than_top
+
+    transition:
+      type: blended
+      height: low
+      sharpness: balanced
+
+  texture:
+    target: textured
+    emphasis: high
+
+  styling:
+    effort: medium
+    direction: >
+      Primarily upward and slightly backward from the front,
+      with separation through the top.
+    finish: matte
+    notes: >
+      The intended result should preserve visible movement and separation
+      instead of appearing flat or heavily slicked down.
+
+  requirements:
+    minimum_top_length: to_verify
+    minimum_side_length: not_required
+
+    hair_characteristics:
+      preferred:
+        - enough_top_length_for_volume
+        - hair_can_hold_some_shape
+
+      workable:
+        - straight_hair
+        - slightly_wavy_hair
+        - medium_density_hair
+
+      challenging:
+        - very_short_top
+        - hair_that_cannot_hold_volume_without_high_effort
+
+  visual_effect:
+    silhouette:
+      - volume_at_front
+      - elevated_top
+      - cleaner_sides
+      - textured_upper_shape
+
+    perceived_effects:
+      - adds_visual_height
+      - creates_more_defined_hair_shape
+      - creates_contrast_between_top_and_sides
+
+  constraints:
+    hard:
+      - insufficient_top_length_for_quiff_shape
+
+    soft:
+      - may_require_regular_styling
+      - may_require_styling_product
+      - result_depends_on_natural_hair_behavior
+      - very_low_styling_effort_preference_may_conflict_with_target_shape
+
+  barber_recipe:
+    top: >
+      Preserve sufficient length through the top and especially the front.
+      Build texture and movement rather than creating one uniform flat shape.
+
+    sides: >
+      Keep the sides shorter and cleaner than the top while maintaining
+      a transition that supports the longer upper section.
+
+    back: >
+      Keep the back controlled and visually connected to the shorter sides.
+
+    transition: >
+      Blend the shorter sides and back into the longer top without removing
+      the length needed to create the quiff silhouette.
+
+    styling: >
+      Style the front upward with slight backward movement.
+      Maintain visible texture and separation through the upper section.
+
+    confirmation_points:
+      - confirm_desired_side_shortness
+      - confirm_transition_or_taper_preference
+      - confirm_how_much_top_length_to_preserve
+      - confirm_expected_daily_styling_effort
+
+  recommendation:
+    strong_signals:
+      - wants_visible_volume
+      - wants_textured_finish
+      - accepts_medium_styling_effort
+      - has_sufficient_top_length
+
+    compatible_signals:
+      - wants_cleaner_sides
+      - wants_defined_but_not_slick_finish
+      - prefers_medium_length_on_top
+      - wants_hair_with_visible_movement
+
+    negative_signals:
+      - wants_zero_or_very_low_styling_effort
+      - wants_uniformly_short_hair
+      - insufficient_top_length
+      - does_not_want_front_volume
+
+  relationships:
+    related_styles:
+      - classic-quiff
+      - messy-quiff
+
+    variations:
+      - textured-quiff-with-low-taper
+      - textured-quiff-with-fade
+
+    contrasts_with:
+      - french-crop
+      - slick-back
+
+  evidence:
+    sources: []
+
+  verification:
+    status: draft
+    confidence: low
+    notes: >
+      Initial Cutback knowledge record. Structural relationships and product
+      behavior may be tested now, but hairstyle-specific claims and barber
+      measurements must be reviewed against reliable sources before this
+      record is marked reviewed or verified.

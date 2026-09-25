@@ -1,0 +1,269 @@
+schema:
+  name: Cutback Hair Knowledge
+  version: "1.0"
+  description: >
+    Canonical knowledge structure for hairstyle records used by Cutback
+    recommendation, personal preview, barber brief, and saved haircut flows.
+
+haircut:
+  id:
+    type: string
+    required: true
+    description: Unique machine-readable hairstyle identifier.
+
+  name:
+    type: string
+    required: true
+    description: Human-readable hairstyle name.
+
+  family:
+    type: string
+    required: true
+    description: General hairstyle family or category.
+
+  description:
+    short:
+      type: string
+      required: true
+
+    barber_summary:
+      type: string
+      required: true
+
+  geometry:
+    top:
+      length:
+        type: string
+        required: true
+
+      volume:
+        type: enum
+        values:
+          - low
+          - medium
+          - high
+
+      direction:
+        type: enum
+        values:
+          - forward
+          - backward
+          - side
+          - natural
+          - mixed
+
+    sides:
+      length:
+        type: string
+        required: true
+
+      treatment:
+        type: string
+        required: true
+
+    back:
+      length:
+        type: string
+        required: true
+
+      treatment:
+        type: string
+        required: true
+
+    transition:
+      type:
+        type: string
+        required: true
+
+      height:
+        type: enum
+        values:
+          - low
+          - mid
+          - high
+          - none
+
+      sharpness:
+        type: enum
+        values:
+          - soft
+          - balanced
+          - sharp
+
+  texture:
+    target:
+      type: enum
+      values:
+        - natural
+        - textured
+        - smooth
+        - defined
+
+    emphasis:
+      type: enum
+      values:
+        - low
+        - medium
+        - high
+
+  styling:
+    effort:
+      type: enum
+      values:
+        - low
+        - medium
+        - high
+
+    direction:
+      type: string
+      required: true
+
+    finish:
+      type: enum
+      values:
+        - matte
+        - natural
+        - shine
+
+    notes:
+      type: string
+      required: false
+
+  requirements:
+    minimum_top_length:
+      type: string
+      required: true
+      description: >
+        Minimum practical top length. Use to_verify when reliable
+        measurement has not yet been established.
+
+    minimum_side_length:
+      type: string
+      required: true
+      description: >
+        Minimum practical side length or not_required when no meaningful
+        minimum is needed.
+
+    hair_characteristics:
+      preferred:
+        type: list
+        items: string
+
+      workable:
+        type: list
+        items: string
+
+      challenging:
+        type: list
+        items: string
+
+  visual_effect:
+    silhouette:
+      type: list
+      items: string
+
+    perceived_effects:
+      type: list
+      items: string
+
+  constraints:
+    hard:
+      type: list
+      items: string
+      description: >
+        Conditions that can make the hairstyle impractical or currently
+        unsuitable.
+
+    soft:
+      type: list
+      items: string
+      description: >
+        Trade-offs or conditions that should influence recommendation
+        reasoning but do not automatically reject the hairstyle.
+
+  barber_recipe:
+    top:
+      type: string
+      required: true
+
+    sides:
+      type: string
+      required: true
+
+    back:
+      type: string
+      required: true
+
+    transition:
+      type: string
+      required: true
+
+    styling:
+      type: string
+      required: true
+
+    confirmation_points:
+      type: list
+      items: string
+
+  recommendation:
+    strong_signals:
+      type: list
+      items: string
+      description: >
+        User or hair-profile signals that strongly support this hairstyle.
+
+    compatible_signals:
+      type: list
+      items: string
+      description: >
+        Signals that are compatible with the hairstyle but are not decisive
+        on their own.
+
+    negative_signals:
+      type: list
+      items: string
+      description: >
+        Signals that reduce suitability or require explanation to the user.
+
+  relationships:
+    related_styles:
+      type: list
+      items: string
+
+    variations:
+      type: list
+      items: string
+
+    contrasts_with:
+      type: list
+      items: string
+
+  evidence:
+    sources:
+      type: list
+      items:
+        id: string
+        title: string
+        url: string
+        source_type: string
+        notes: string
+
+  verification:
+    status:
+      type: enum
+      values:
+        - draft
+        - reviewed
+        - verified
+
+    confidence:
+      type: enum
+      values:
+        - low
+        - medium
+        - high
+
+    notes:
+      type: string
+      required: false
