@@ -67,7 +67,7 @@ Cutback brings those steps together:
 - **Discover:** understand visible hair characteristics and explore suitable styles.
 - **Preview:** compare the original photo with a simulation of the selected style.
 - **Communicate:** take a structured brief to the barber.
-- **Repeat:** reopen a saved brief without starting the process again.
+- **Repeat:** reopen a saved brief witho ut starting the process again.
 
 The initial audience is men who want help choosing and repeating a haircut. Barbers receive the brief; a barber account or dashboard is outside the current MVP scope.
 
@@ -209,6 +209,33 @@ Before treating a component as developer-ready:
 
 Do not document unverified commands as working setup instructions.
 
+### Manual Setup
+
+**Backend**
+`ash
+cd backend
+npm install
+npm run dev
+`
+By default, the backend runs on port 3000.
+
+**Frontend**
+`ash
+cd frontend
+npm install
+# Create a .env file with backend URL if not localhost:3000
+# VITE_API_BASE_URL=http://localhost:3000
+npm run dev
+`
+By default, the frontend runs and connects to localhost:3000.
+
+### Using `cutback.sh`
+To quickly manage the frontend and backend locally in Windows Git Bash, a manager script is provided in the root directory:
+```bash
+./cutback.sh
+```
+This script opens an interactive menu to start (`ON`), stop (`OFF`), restart, and manage ports for the local services (Backend on 3000, Frontend on 8080) running in the background.
+
 ## Next milestone: executable graph vertical slice
 
 The immediate goal is not to implement every MVP capability at once. The next milestone is to prove one real graph-orchestrated AI slice:
@@ -310,3 +337,4 @@ Submission readiness still requires a functional hosted demo, verified repositor
 Prototype authoring: Figma Make.
 
 Record the provenance and publication permissions of demonstration portraits and other assets before publishing the repository. This README does not assign a license to the code or images; document the chosen license and asset terms separately.
+

@@ -1,0 +1,10 @@
+{
+  "description": "Streamline your haircut journey with an interactive prototype that guides users through photo uploads, AI analysis, and style recommendations for a personalized experience.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

@@ -1,0 +1,5 @@
+# Cutback manager files
+.cutback_backend.log
+.cutback_frontend.log
+.cutback_backend.pid
+.cutback_frontend.pid

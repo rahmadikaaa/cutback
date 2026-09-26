@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cutback</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>Cutback</h1>
+    </header>
+    <main>
+      <div id="upload-section" class="card">
+        <h2>Upload Your Photo</h2>
+        <div id="error-message" class="error hidden"></div>
+        
+        <div class="file-input-wrapper">
+          <input type="file" id="photo-input" accept="image/jpeg, image/png, image/webp" />
+          <label for="photo-input" class="btn">Select Photo</label>
+        </div>
+
+        <div id="preview-container" class="hidden">
+          <img id="photo-preview" src="" alt="Preview" />
+          <button id="replace-btn" class="btn secondary">Replace Photo</button>
+        </div>
+
+        <div class="consent-wrapper">
+          <input type="checkbox" id="consent-checkbox" />
+          <label for="consent-checkbox">I consent to AI processing of this photo for hairstyle recommendations.</label>
+        </div>
+
+        <button id="submit-btn" class="btn primary" disabled>Analyze Photo</button>
+        
+        <div id="loading-state" class="hidden">
+          <div class="spinner"></div>
+          <p>Processing...</p>
+        </div>
+      </div>
+      
+      <div id="result-section" class="card hidden">
+        <h2>Analysis Result</h2>
+        <p id="route-message"></p>
+        <p id="revision-info"></p>
+        
+        <div id="analysis-output" class="hidden">
+          <h3>Visual Suitability</h3>
+          <p id="visual-suitability-text"></p>
+          
+          <h3>Hair Attributes</h3>
+          <ul id="attributes-list"></ul>
+        <div id="preferences-section" class="mt-4 hidden">
+          <h3>Optional Preferences</h3>
+          <div class="form-group">
+            <label for="vibe-input">Vibe (e.g. professional, edgy)</label>
+            <input type="text" id="vibe-input" placeholder="Vibe" />
+          </div>
+          <div class="form-group">
+            <label for="length-select">Desired Length</label>
+            <select id="length-select">
+              <option value="">Any</option>
+              <option value="shorter">Shorter</option>
+              <option value="same">Same</option>
+              <option value="longer">Longer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="effort-select">Styling Effort</label>
+            <select id="effort-select">
+              <option value="">Any</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="note-input">Optional Note (max 500 chars)</label>
+            <textarea id="note-input" maxlength="500"></textarea>
+          </div>
+          <button id="get-recommendations-btn" class="btn primary">Get Recommendations</button>
+        </div>
+        
+        <div id="recommendations-container" class="mt-4 hidden">
+          <h3>Recommended Hairstyles</h3>
+          <div id="recommendations-list"></div>
+          <button id="select-hairstyle-btn" class="btn primary" disabled>Confirm Selection</button>
+        </div>
+        
+        <div id="loading-recs" class="hidden">
+          <div class="spinner"></div>
+          <p>Generating Recommendations...</p>
+        </div>
+
+        <div id="preview-section" class="mt-4 hidden">
+          <h3>Personal Hairstyle Preview</h3>
+          <p><em>AI Simulation Disclaimer: This is an AI-generated preview for visualization purposes. Final results may vary.</em></p>
+          <div id="preview-images" style="display: flex; gap: 1rem; margin-bottom: 1rem; justify-content: center; align-items: center;">
+             <div>
+                <h4>Original</h4>
+                <img id="preview-original-img" src="" alt="Original" style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+             </div>
+             <div>
+                <h4>Possible (<span id="preview-style-name"></span>)</h4>
+                <img id="preview-result-img" src="" alt="Result" style="max-width: 200px; max-height: 200px; border-radius: 8px; display: none;">
+                <div id="preview-loading" class="spinner hidden"></div>
+                <p id="preview-error" class="hidden" style="color: red;"></p>
+             </div>
+          </div>
+          <button id="generate-preview-btn" class="btn primary">Generate Preview</button>
+          <button id="retry-preview-btn" class="btn secondary hidden">Retry Preview</button>
+          <button id="continue-without-preview-btn" class="btn secondary">Continue Without Preview</button>
+        </div>
+
+        <button id="start-over-btn" class="btn secondary mt-4">Start Over</button>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

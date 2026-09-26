@@ -1,0 +1,2 @@
+npm notice run backend@1.0.0 dev
+npm notice run ts-node src/server.ts
