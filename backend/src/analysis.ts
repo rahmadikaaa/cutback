@@ -3,6 +3,7 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { revisions } from './state';
+import { saveRevision } from './firestoreDb';
 import crypto from 'crypto';
 
 // T3.1: Analysis Schema
@@ -87,12 +88,14 @@ export const analysisFlow = ai.defineFlow({
     if (!analysis.visualSuitability.isValid) {
       state.status = 'FAILED';
       state.error = analysis.visualSuitability.reason || 'Visually inadequate photo.';
+      await saveRevision(input.revisionId, state);
       return { route: 'REUPLOAD' as const, message: state.error || 'Visually inadequate photo.' };
     }
 
     // T3.7: Bind result to photo/revision ID
     state.status = 'ANALYZED';
     state.analysis = analysis;
+    await saveRevision(input.revisionId, state);
 
     return { route: 'SUCCESS' as const, analysis, message: 'Analysis complete.' };
   } catch (err: any) {
@@ -101,6 +104,7 @@ export const analysisFlow = ai.defineFlow({
     // T3.14: Route schema failure/retry through deterministic state
     state.status = 'FAILED';
     state.error = err.message || 'Analysis failed or schema validation failed.';
+    await saveRevision(input.revisionId, state);
     return { route: 'RETRY_REQUIRED' as const, message: state.error || 'Analysis failed' };
   }
 });
