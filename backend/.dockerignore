@@ -1,0 +1,7 @@
+# Patterns to exclude from Docker build context
+node_modules/
+dist/
+.env
+*.log
+*.pid
+coverage/

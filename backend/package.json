@@ -15,10 +15,12 @@
   "type": "commonjs",
   "dependencies": {
     "@genkit-ai/google-genai": "^1.42.0",
+    "@google-cloud/storage": "^8.2.0",
     "@google/genai": "^2.24.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
+    "firebase-admin": "^14.5.0",
     "multer": "^2.4.0"
   },
   "devDependencies": {
