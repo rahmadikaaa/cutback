@@ -3,6 +3,7 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { revisions } from './state';
+import { saveRevision } from './firestoreDb';
 import crypto from 'crypto';
 
 export const RecommendationSchema = z.object({
@@ -103,6 +104,8 @@ export const recommendationFlow = ai.defineFlow({
     // T4.5: Reset selection when generating new recommendations
     state.selectedHairstyleId = undefined;
 
+    await saveRevision(input.revisionId, state);
+
     return { route: 'SUCCESS' as const, recommendations: recommendationsResult, message: 'Recommendations ready.' };
   } catch (err: any) {
     console.error('Recommendation error:', err);
@@ -111,7 +114,7 @@ export const recommendationFlow = ai.defineFlow({
 });
 
 // T4.7: Deterministic endpoint to select a hairstyle
-export const selectHairstyleHandler = (req: Request, res: Response) => {
+export const selectHairstyleHandler = async (req: Request, res: Response) => {
   const { revisionId, hairstyleId } = req.body;
   const state = revisions.get(revisionId);
 
@@ -126,6 +129,8 @@ export const selectHairstyleHandler = (req: Request, res: Response) => {
 
   state.selectedHairstyleId = hairstyleId;
   state.status = 'READY_FOR_PREVIEW';
+
+  await saveRevision(revisionId, state);
 
   console.log(`[style_selected] Revision: ${revisionId}, Style: ${hairstyleId}`);
 

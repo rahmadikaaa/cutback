@@ -3,6 +3,7 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { revisions } from './state';
+import { saveRevision } from './firestoreDb';
 import crypto from 'crypto';
 
 const ai = genkit({
@@ -90,16 +91,21 @@ export const previewFlow = ai.defineFlow({
       }
       state.previewImageUrl = finalUrl;
       
+      await saveRevision(input.revisionId, state);
+      
       return { route: 'SUCCESS' as const, message: 'Preview generated successfully.', previewImageUrl: state.previewImageUrl };
     } catch (err: any) {
       console.error('Preview error:', err);
       state.previewState = 'FAILED';
       state.error = err.message || 'Image generation failed.';
+      await saveRevision(input.revisionId, state);
       return { route: 'FAILED' as const, message: state.error || 'Preview failed' };
     } finally {
       state.previewPromise = undefined;
     }
   })();
+
+  await saveRevision(input.revisionId, state);
 
   return await state.previewPromise;
 });
