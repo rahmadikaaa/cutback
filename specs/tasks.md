@@ -55,9 +55,11 @@ T8  Graph reliability, privacy, quota & observability
 T9  End-to-end acceptance
  ↓
 T10 GCP deployment + AI Builder Cup readiness
+ ↓
+T11 Firebase & Google Cloud Foundation (Cloud Run, Firestore, Storage, Hosting)
 ```
 
-**Critical MVP path:** T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T9 → T10.  
+**Critical MVP path:** T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T9 → T10 → T11.  
 T8 is not a cleanup phase: its controls must be implemented alongside T1–T7 and verified before release.
 
 ---
@@ -501,6 +503,74 @@ This is the recommended implementation target immediately after the foundation i
 
 ---
 
+# PHASE 5 — Firebase & Google Cloud Foundation (Target / Planned)
+
+## T11 — Firebase & Google Cloud Integration
+
+**Status:** TODO (PLANNED)  
+**Goal:** Transition the local working E2E baseline to Google Cloud & Firebase production architecture incrementally, without breaking the existing local working flow.  
+**Depends on:** T0–T9 baseline lock (`feat: lock local working E2E baseline`).  
+**References:** Design §29; Requirements BF-01, BF-04, EVT-01–EVT-08.
+
+### T11.1 — Firebase & GCP Project Setup
+- [ ] Initialize / link Google Cloud & Firebase project for Cutback (`firebase.json`, `.firebaserc`).
+- [ ] Enable required GCP APIs (Cloud Run, Secret Manager, Cloud Storage, Firestore, Artifact Registry).
+- [ ] Establish cloud vs local environment configuration and isolation rules without committing secrets.
+
+### T11.2 — Secret Manager Configuration
+- [ ] Provision Secret Manager secret for `GEMINI_API_KEY`.
+- [ ] Grant Cloud Run runtime service account permission (`roles/secretmanager.secretAccessor`) to the secret.
+- [ ] Update backend environment loader to seamlessly read from Secret Manager or environment variables in production while preserving local `.env` support.
+
+### T11.3 — Cloud Run Backend Containerization & Deployment
+- [ ] Author production `Dockerfile` for Express + Genkit backend (Node 20 slim, non-root user).
+- [ ] Validate container build and runtime behavior locally on dynamic `PORT`.
+- [ ] Configure Cloud Run service settings (min instances: 0, concurrency, memory limits, request timeout matching analysis and preview SLAs).
+- [ ] Deploy container to Cloud Run and verify HTTPS health endpoint.
+
+### T11.4 — Cloud Storage for Images (Originals & Previews)
+- [ ] Provision Cloud Storage bucket for user portraits and generated previews with CORS and lifecycle policies.
+- [ ] Implement backend storage adapter to upload original user photos and generated previews to Cloud Storage instead of storing large base64 strings in memory.
+- [ ] Generate signed or public URLs for client consumption while preserving privacy and expiration rules.
+
+### T11.5 — Firestore Structured State & Session Persistence
+- [ ] Initialize Firestore database in Native mode.
+- [ ] Design Firestore collection/document data schema for session revisions (`sessions/{sessionId}/revisions/{revisionId}`).
+- [ ] Implement backend persistence adapter to write structured photo analysis, recommendations, and preview metadata to Firestore.
+- [ ] Guarantee revision consistency and idempotency against duplicate or out-of-order requests.
+
+### T11.6 — Cloud-Backed Saved Haircut Persistence
+- [ ] Define Firestore data schema for saved haircut snapshots (`savedHaircuts` collection or user subcollection).
+- [ ] Implement API endpoints or client adapter for Save, Reopen, and Delete with idempotent guarantees.
+- [ ] Maintain "Repeat This Cut" zero-AI-call invariant when loading haircuts from Firestore.
+- [ ] Provide seamless fallback to local IndexedDB when running in offline/local development mode.
+
+### T11.7 — Firebase Hosting for Frontend SPA
+- [ ] Configure `firebase.json` for Firebase Hosting to serve the React + Vite static bundle (`frontend/dist`).
+- [ ] Configure SPA rewrite rules (`"rewrites": [{"source": "**", "destination": "/index.html"}]`) and asset caching headers.
+- [ ] Inject production Cloud Run API base URL (`VITE_API_BASE_URL`) into frontend build.
+- [ ] Deploy and verify the React SPA loads and functions correctly on the `.web.app` / `.firebaseapp.com` domain.
+
+### T11.8 — Cloud Security, IAM & Quota Controls
+- [ ] Configure least-privilege IAM roles for Cloud Run service account.
+- [ ] Configure Firestore and Cloud Storage security rules.
+- [ ] Configure CORS policy on Cloud Run allowing requests only from authorized frontend origins.
+- [ ] Implement rate limiting / quota caps to guard against denial-of-wallet / excessive AI token usage.
+
+### T11.9 — Cloud E2E Integration & Verification
+- [ ] Run full E2E flow against deployed frontend and Cloud Run backend (Upload → Analysis → Recommendations → Preview → Barber Brief → Save Haircut).
+- [ ] Verify original image and generated preview exist in Cloud Storage.
+- [ ] Verify session and saved haircut documents exist in Firestore.
+- [ ] Verify "Repeat This Cut" loads from cloud persistence without triggering model execution.
+- [ ] Verify error handling (invalid images, rate limits, network retries) in cloud environment.
+
+### T11.10 — Documentation & Operations Runbook
+- [ ] Document cloud deployment steps, required CLI commands, and environment variables in README and architecture docs.
+- [ ] Create architecture diagram and component interaction summary for AI Builder Cup submission.
+- [ ] Document monitoring, logging (Cloud Logging / Genkit traces), and budget alerting setup.
+
+---
+
 # 5. Deferred / Not Blocking MVP
 
 The following must **not** delay the current critical path unless the spec is intentionally changed:
@@ -619,5 +689,6 @@ Next dependency unlocked:
 | Product graph vertical slice | Not yet proven by this document |
 | E2E MVP acceptance | Not yet proven by this document |
 | GCP submission deployment | Not yet proven by this document |
+| Firebase & Google Cloud Foundation | **T11 planned; pending cloud implementation** |
 
 

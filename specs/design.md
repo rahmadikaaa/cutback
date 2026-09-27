@@ -2047,3 +2047,31 @@ The minimum viable model locked in for image generation is **`googleai/gemini-3.
 - **Gap to Release**: 
   - Manual E2E scenario execution via browser.
   - GCP deployment (Cloud Run) and AI Builder Cup presentation readiness.
+
+------------------------------------------------------------------------
+
+# 29. Firebase & Google Cloud Target Architecture (Planned / In-Progress)
+
+> **Status:** TARGET / PLANNED — NOT YET IMPLEMENTED.  
+> **Baseline Guarantee:** The local working E2E baseline (Express + Genkit backend on port 3000, React + Vite frontend on port 8443, local IndexedDB persistence) remains fully functional and untouched until cloud components are verified.
+
+## 29.1 Component Mapping
+
+| Component | Current Local Baseline | Target Cloud Architecture | Role / Responsibility |
+| --- | --- | --- | --- |
+| **Frontend Web App** | React 19 + Vite (port 8443) | **Firebase Hosting** | Serves static assets, handles SPA routing, interacts with Cloud Run backend via configured API base URL. |
+| **Backend API & Genkit** | Node.js / Express (port 3000) | **Cloud Run** (fully managed container) | Stateless API running Express + Genkit orchestration (`gemini-2.5-flash` / `gemini-3.1-flash-image`). Auto-scaling, HTTPS endpoints. |
+| **Structured State & Sessions** | In-memory `RevisionState` map | **Firestore** (Native Mode) | Persistent structured storage for session state, photo analysis results, recommendations, revision linkages, and saved haircuts. |
+| **Media / Image Storage** | In-memory base64 strings | **Cloud Storage for Firebase** | Scalable, persistent blob storage for uploaded original portraits and generated AI previews, generating signed or public download URLs. |
+| **Secrets Management** | Local `.env` file (git-ignored) | **Secret Manager** | Secure injection of `GEMINI_API_KEY` into Cloud Run without committing secrets to source control. |
+| **Authentication** | None (anonymous local session) | **Open Decision** (Anonymous Firebase Auth vs authenticated profiles) | To be determined based on MVP requirements; initial target supports anonymous/session-based usage. |
+
+## 29.2 Data Flow & Invariants Preservation
+
+1. **Deterministic Pre-Checks:** Client and server-side photo validation, MIME checking, and size limits remain deterministic before any paid AI or cloud storage operation.
+2. **Analysis & Recommendations:** Frontend sends photo to Cloud Run API; Cloud Run stores original image in Cloud Storage, calls Genkit (`gemini-2.5-flash`), writes structured analysis and recommendations to Firestore session record, and returns validated schema to client.
+3. **Personal Preview Generation:** Triggered strictly on explicit user selection. Cloud Run executes image generation (`gemini-3.1-flash-image`), persists the preview image in Cloud Storage, updates the Firestore revision record, and returns the image URL. Server-side promise deduplication is preserved.
+4. **Deterministic Barber Brief:** Generated client-side or server-side from structured attributes; no reasoning LLM is invoked.
+5. **Saved Haircuts & Repeat This Cut:** Saved haircut snapshots persist in Firestore / IndexedDB cache. "Repeat This Cut" continues to execute with **zero AI calls**, reading stored briefs directly from persistent storage.
+6. **Cost & Quota Controls:** Secret Manager protects API credentials. Cloud Run concurrency, timeout limits (60s analysis / 120s image), and request size caps prevent budget overruns.
+
