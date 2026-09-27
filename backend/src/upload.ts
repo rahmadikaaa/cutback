@@ -3,6 +3,7 @@ import { genkit } from 'genkit';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { revisions } from './state';
+import { saveRevision } from './firestoreDb';
 
 const isImage = (buffer: Buffer): boolean => {
   if (buffer.length < 12) return false;
@@ -52,11 +53,16 @@ const uploadFlow = ai.defineFlow({
   const mime = input.mimeType || 'image/jpeg';
   const base64Data = buffer.toString('base64');
   
-  revisions.set(revisionId, {
+  const state = {
     id: revisionId,
-    status: 'READY',
+    status: 'READY' as const,
     imageBase64: `data:${mime};base64,${base64Data}`
-  });
+  };
+  revisions.set(revisionId, state);
+
+  // Persist the structured data to Firestore, silently skipping if not configured
+  // The saveRevision abstraction intentionally strips out imageBase64 and other large/transient objects
+  await saveRevision(revisionId, state);
 
   return { 
     route: 'READY_FOR_ANALYSIS' as const, 
