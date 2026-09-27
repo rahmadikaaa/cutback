@@ -24,6 +24,7 @@ export async function saveRevision(revisionId: string, state: RevisionState): Pr
     previewState,
     error,
     originalImagePath,
+    previewImagePath,
   } = state;
 
   const docData = {
@@ -36,6 +37,7 @@ export async function saveRevision(revisionId: string, state: RevisionState): Pr
     ...(previewState && { previewState }),
     ...(error && { error }),
     ...(originalImagePath && { originalImagePath }),
+    ...(previewImagePath && { previewImagePath }),
     updatedAt: new Date().toISOString(), // Adding a timestamp for good measure
   };
 

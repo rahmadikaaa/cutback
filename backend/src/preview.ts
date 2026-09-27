@@ -4,6 +4,7 @@ import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { revisions } from './state';
 import { saveRevision } from './firestoreDb';
+import { uploadPreviewImage } from './cloudStorage';
 import crypto from 'crypto';
 
 const ai = genkit({
@@ -90,6 +91,16 @@ export const previewFlow = ai.defineFlow({
         finalUrl = `data:image/jpeg;base64,${finalUrl}`;
       }
       state.previewImageUrl = finalUrl;
+
+      // Upload preview image to Cloud Storage if enabled
+      try {
+        const storagePath = await uploadPreviewImage(input.revisionId, finalUrl);
+        if (storagePath) {
+          state.previewImagePath = storagePath;
+        }
+      } catch (storageErr: any) {
+        console.error(`[preview] Storage upload error: ${storageErr.message}`);
+      }
       
       await saveRevision(input.revisionId, state);
       
