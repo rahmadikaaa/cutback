@@ -259,9 +259,9 @@ Structured analysis returned to UI
 Minimum success conditions:
 
 - [ ] Canonical technical decisions required by the current T0 gate are locked.
-- [ ] Backend/API foundation runs locally.
+- [x] Backend/API foundation runs locally.
 - [ ] An executable ADK graph is demonstrated.
-- [ ] At least one real Google AI/Gemini request succeeds intentionally.
+- [x] At least one real Google AI/Gemini request succeeds intentionally.
 - [ ] Photo validation and consent happen before paid AI processing.
 - [ ] AI output is validated against the expected schema before UI use.
 - [ ] Unknown attributes remain explicit rather than being invented.
@@ -274,13 +274,13 @@ A stronger vertical slice continues through grounded recommendations and user ha
 
 After the graph foundation is proven, the MVP target remains one complete journey using a user's own photo, real AI responses, and a saved brief that can be reopened.
 
-- [ ] Validate photo input and consent before AI processing.
-- [ ] Produce structured analysis and personalized recommendations.
+- [x] Validate photo input and consent before AI processing.
+- [x] Produce structured analysis and personalized recommendations.
 - [ ] Keep preferences optional.
-- [ ] Generate a preview only for the selected hairstyle.
-- [ ] Keep the selected style, preview, and brief consistent by revision.
+- [x] Generate a preview only for the selected hairstyle.
+- [x] Keep the selected style, preview, and brief consistent by revision.
 - [ ] Allow a brief to continue when preview generation fails.
-- [ ] Save, refresh, reopen, repeat, and delete a haircut successfully.
+- [ ] Save, refresh, reopen, repeat, and delete a haircut successfully (Pending My Haircuts bug).
 - [ ] Ensure Repeat This Cut does not require a new AI call.
 - [ ] Handle invalid input, analysis failure, preview failure, stale results, quota exhaustion, and failed saves.
 - [ ] Prevent duplicate paid requests and enforce server-side limits.
@@ -337,4 +337,6 @@ Submission readiness still requires a functional hosted demo, verified repositor
 Prototype authoring: Figma Make.
 
 Record the provenance and publication permissions of demonstration portraits and other assets before publishing the repository. This README does not assign a license to the code or images; document the chosen license and asset terms separately.
+
+
 

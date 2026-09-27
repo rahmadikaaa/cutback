@@ -212,3 +212,10 @@ The next priority is:
 > **Prove the Cutback Hair Knowledge model with a tiny but complete dataset.**
 
 Once that works, the knowledge base, UX, AI integration, and scale strategy can grow from the same foundation.
+
+## Update — 2026-09-26
+- **End-to-End Status**: User-reported manual verification confirms the main flow runs successfully end-to-end (Upload ? Analysis ? Recommendations ? Preview ? Barber Brief).
+- **Documentation**: Aligned README.md, specs/tasks.md, and specs/design.md with current codebase, which is now migrated to a React (Vite) frontend.
+- **Known Issues**: My Haircuts bug remains pending. Save/refresh/reopen/delete functionalities are not yet fully validated due to this bug.
+- **Merge/Deployment**: Changes have been pushed to their respective branches but are not yet merged to production or deployed to GCP.
+- **Next Actions**: Resolve the "My Haircuts" bug and complete T7 validation. Proceed to T9 (End-to-end acceptance suite) and T10 (Deployment).

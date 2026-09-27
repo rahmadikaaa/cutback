@@ -312,21 +312,21 @@ This is the recommended implementation target immediately after the foundation i
 **References:** **FR-05**, FR-10, NFR-08/09/11; **AC-05.1–05.5**, E2E-04/05.
 
 ### Tasks
-- [ ] **T5.1** Lock image provider/model and generation contract in `design.md`.
-- [ ] **T5.2** Trigger generation only from explicit Preview/Choose action.
-- [ ] **T5.3** One request → one preview for one revision; no mass generation for all recommendations.
-- [ ] **T5.4** Preserve face identity, skin tone, framing/background as far as the selected model permits.
-- [ ] **T5.5** Keep original portrait available for Original/Possible comparison.
-- [ ] **T5.6** Label output as AI simulation and communicate that real haircut may differ.
-- [ ] **T5.7** Deduplicate double-click/pending identical jobs server-side.
-- [ ] **T5.8** If hairstyle changes while a job is pending, late result cannot overwrite the new selection.
-- [ ] **T5.9** Persist successful preview through navigation; do not regenerate on page return.
-- [ ] **T5.10** Provide retry within quota and “continue without preview”.
-- [ ] **T5.11** Add visual QA evidence for identity consistency + hairstyle alignment.
-- [ ] **T5.12** Instrument preview requested/completed/failed accurately.
-- [ ] **T5.13** Implement preview generation as the visual-generation branch after human selection; it must not be triggered by graph navigation alone.
-- [ ] **T5.14** Feed preview branch result as explicit structured state (`succeeded` / `failed` / `stale` / `skipped`) for downstream join/finalization.
-- [ ] **T5.15** Do not use an LLM router for quota or preview-state decisions; route from structured server state.
+- [x] **T5.1** Lock image provider/model and generation contract in `design.md`.
+- [x] **T5.2** Trigger generation only from explicit Preview/Choose action.
+- [x] **T5.3** One request → one preview for one revision; no mass generation for all recommendations.
+- [x] **T5.4** Preserve face identity, skin tone, framing/background as far as the selected model permits.
+- [x] **T5.5** Keep original portrait available for Original/Possible comparison.
+- [x] **T5.6** Label output as AI simulation and communicate that real haircut may differ.
+- [x] **T5.7** Deduplicate double-click/pending identical jobs server-side.
+- [x] **T5.8** If hairstyle changes while a job is pending, late result cannot overwrite the new selection.
+- [x] **T5.9** Persist successful preview through navigation; do not regenerate on page return.
+- [x] **T5.10** Provide retry within quota and “continue without preview”.
+- [x] **T5.11** Add visual QA evidence for identity consistency + hairstyle alignment.
+- [x] **T5.12** Instrument preview requested/completed/failed accurately.
+- [x] **T5.13** Implement preview generation as the visual-generation branch after human selection; it must not be triggered by graph navigation alone.
+- [x] **T5.14** Feed preview branch result as explicit structured state (`succeeded` / `failed` / `stale` / `skipped`) for downstream join/finalization.
+- [x] **T5.15** Do not use an LLM router for quota or preview-state decisions; route from structured server state.
 
 ### Acceptance evidence
 - [ ] Double click = one job — AC-05.1.
@@ -345,19 +345,19 @@ This is the recommended implementation target immediately after the foundation i
 **References:** **FR-07**, FR-10, NFR-01/09; **AC-07.1–07.4**.
 
 ### Tasks
-- [ ] **T6.1** Define brief data contract tied to active revision.
-- [ ] **T6.2** Include model, user photo, valid preview if available, top/side/back detail, fade, styling and note as available.
-- [ ] **T6.3** Unknown details display “confirm with barber” rather than invented measurements.
-- [ ] **T6.4** Allow note edit up to 500 Unicode characters.
-- [ ] **T6.5** Explain that note edits do not automatically change the generated preview.
-- [ ] **T6.6** Mark old brief stale when model/visual parameters change.
-- [ ] **T6.7** Support brief creation without preview when preview failed/unavailable.
-- [ ] **T6.8** Instrument `brief_created` only for valid current brief.
-- [ ] **T6.9** Build the baseline brief from validated structured fields using deterministic code/template logic; do **not** call an LLM merely to rewrite known haircut parameters.
-- [ ] **T6.10** Unknown/missing measurements remain explicit (`confirm with barber`) and are never filled by model inference.
-- [ ] **T6.11** Where runtime support and UX timing justify it, run **preview generation** and **brief construction** as independent post-selection branches.
-- [ ] **T6.12** Join/finalize branch outputs so preview failure never converts a valid brief branch into total-flow failure.
-- [ ] **T6.13** Record per-branch latency/status and total post-selection latency for Cup evidence.
+- [x] **T6.1** Define brief data contract tied to active revision.
+- [x] **T6.2** Include model, user photo, valid preview if available, top/side/back detail, fade, styling and note as available.
+- [x] **T6.3** Unknown details display “confirm with barber” rather than invented measurements.
+- [x] **T6.4** Allow note edit up to 500 Unicode characters.
+- [x] **T6.5** Explain that note edits do not automatically change the generated preview.
+- [x] **T6.6** Mark old brief stale when model/visual parameters change.
+- [x] **T6.7** Support brief creation without preview when preview failed/unavailable.
+- [x] **T6.8** Instrument `brief_created` only for valid current brief.
+- [x] **T6.9** Build the baseline brief from validated structured fields using deterministic code/template logic; do **not** call an LLM merely to rewrite known haircut parameters.
+- [x] **T6.10** Unknown/missing measurements remain explicit (`confirm with barber`) and are never filled by model inference.
+- [x] **T6.11** Where runtime support and UX timing justify it, run **preview generation** and **brief construction** as independent post-selection branches.
+- [x] **T6.12** Join/finalize branch outputs so preview failure never converts a valid brief branch into total-flow failure.
+- [x] **T6.13** Record per-branch latency/status and total post-selection latency for Cup evidence.
 
 ### Acceptance evidence
 - [ ] No preview still produces usable brief — AC-07.1.
@@ -619,4 +619,5 @@ Next dependency unlocked:
 | Product graph vertical slice | Not yet proven by this document |
 | E2E MVP acceptance | Not yet proven by this document |
 | GCP submission deployment | Not yet proven by this document |
+
 

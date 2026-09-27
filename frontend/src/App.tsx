@@ -12,6 +12,7 @@ import {
   type BackendRecommendationItem,
   type RecommendationPreferencesInput,
 } from './api'
+import { get, set } from 'idb-keyval'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -2067,21 +2068,31 @@ export default function App() {
   const [savedHaircuts, setSavedHaircuts] = useState<SavedHaircut[]>([])
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
+  useEffect(() => {
+    get('cutback_haircuts').then((data: SavedHaircut[]) => {
+      if (data) setSavedHaircuts(data)
+    }).catch(console.error)
+  }, [])
+
   const photo = selectedPhoto ?? portrait1
   const currentChosenHairstyle = recommendations[chosenRec ?? 0] ?? HAIRSTYLES[0]
 
   function handleSave() {
     const rec = currentChosenHairstyle
     const id = Math.random().toString(36).slice(2)
-    setSavedHaircuts(prev => [{
-      id,
-      name: saveName.trim() || rec.name,
-      date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      hairstyleId: rec.id,
-      previewImageUrl: previewImageUrl || undefined,
-      rec,
-      originalPhotoUrl: selectedPhoto || undefined
-    }, ...prev])
+    setSavedHaircuts(prev => {
+      const newArr = [{
+        id,
+        name: saveName.trim() || rec.name,
+        date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        hairstyleId: rec.id,
+        previewImageUrl: previewImageUrl || undefined,
+        rec,
+        originalPhotoUrl: selectedPhoto || undefined
+      }, ...prev];
+      set('cutback_haircuts', newArr).catch(console.error);
+      return newArr;
+    })
     setScreen('save-success')
   }
 
@@ -2129,7 +2140,11 @@ export default function App() {
   }
 
   function handleConfirmDelete(id: string) {
-    setSavedHaircuts(prev => prev.filter(h => h.id !== id))
+    setSavedHaircuts(prev => {
+      const newArr = prev.filter(h => h.id !== id);
+      set('cutback_haircuts', newArr).catch(console.error);
+      return newArr;
+    })
   }
 
   async function loadRecommendations(prefsToUse = prefs) {

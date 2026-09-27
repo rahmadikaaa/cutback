@@ -2028,3 +2028,22 @@ The minimum viable model locked in for image generation is **`googleai/gemini-3.
 - **Purpose**: Generates a personal hairstyle preview matching the selected hairstyle.
 - **Constraints**: It must use the user's original photo and preserve face identity, skin tone, pose, framing, and background, while altering only the hairstyle.
 - **State management**: Previews are tied explicitly to a `selectedHairstyleId` for a given revision. Duplicate clicks will not generate duplicate paid requests.
+
+------------------------------------------------------------------------
+
+# Implementation Update (2026-09-26)
+
+## Current Architecture & AI Integration
+- **Frontend**: A React application powered by Vite. The frontend connects to the backend API natively via environment variables (VITE_API_BASE_URL).
+- **Backend & AI Integration**: 
+  - Backend is Node.js/Express. Graph orchestration uses Google Genkit with `googleai/gemini-3.1-flash-image` for previews.
+  - Deterministic photo upload and validation are implemented.
+  - The reasoning node for Analysis uses the Google GenAI model via Genkit and returns a validated schema.
+  - Recommendations are returned from the backend reasoning node as structured data.
+  - Preview generation implements server-side deduplication (double-clicks await the same promise) and stale-result protection.
+  - Deterministic Barber Brief is fully implemented client-side without reasoning nodes.
+- **Storage/Persistence**: Saving and persistence are fully implemented using Local Device Mode via IndexedDB (`idb-keyval`). The "My Haircuts" feature supports Save, Reopen, and Delete with idempotent guarantees.
+- **Repeat This Cut**: Allows users to repeat a saved brief and view the preview with **zero AI calls**, strictly loading from IndexedDB persistence.
+- **Gap to Release**: 
+  - Manual E2E scenario execution via browser.
+  - GCP deployment (Cloud Run) and AI Builder Cup presentation readiness.

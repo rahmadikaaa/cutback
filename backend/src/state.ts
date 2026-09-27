@@ -14,6 +14,7 @@ export interface RevisionState {
   selectedHairstyleId?: string;
   previewState?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'STALE' | 'SKIPPED';
   previewImageUrl?: string;
+  previewPromise?: Promise<any>;
   error?: string;
 }
 

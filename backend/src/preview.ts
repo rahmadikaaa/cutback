@@ -39,6 +39,9 @@ export const previewFlow = ai.defineFlow({
 
   // Double click / duplicate request check (T5.6)
   if (state.previewState === 'PENDING') {
+    if (state.previewPromise) {
+      return await state.previewPromise;
+    }
     return { route: 'SUCCESS' as const, message: 'Preview generation already in progress.' };
   }
   
@@ -54,45 +57,51 @@ export const previewFlow = ai.defineFlow({
 
   state.previewState = 'PENDING';
 
-  try {
-    // T5.4: Instruct generation to preserve identity, skin tone, pose, framing, background
-    const prompt = `A photo of a person. Preserve face identity, skin tone, pose, framing, and background EXACTLY. Change ONLY the hairstyle to match: ${selectedHairstyle.name} - ${selectedHairstyle.description}. The hair should seamlessly match the person's face shape (${state.analysis?.attributes?.faceShape || 'unknown'}) and hair type (${state.analysis?.attributes?.hairType || 'unknown'}).`;
+  state.previewPromise = (async () => {
+    try {
+      // T5.4: Instruct generation to preserve identity, skin tone, pose, framing, background
+      const prompt = `A photo of a person. Preserve face identity, skin tone, pose, framing, and background EXACTLY. Change ONLY the hairstyle to match: ${selectedHairstyle.name} - ${selectedHairstyle.description}. The hair should seamlessly match the person's face shape (${state.analysis?.attributes?.faceShape || 'unknown'}) and hair type (${state.analysis?.attributes?.hairType || 'unknown'}).`;
 
-    // Try to pass the original image for image-to-image/inpainting editing if Imagen supports it
-    // If not, at least we pass it in the prompt array
-    const { media } = await ai.generate({
-      model: 'googleai/gemini-3.1-flash-image',
-      prompt: [
-        { text: prompt },
-        { media: { url: state.imageBase64! } }
-      ],
-      output: { format: 'media' }
-    });
+      // Try to pass the original image for image-to-image/inpainting editing if Imagen supports it
+      // If not, at least we pass it in the prompt array
+      const { media } = await ai.generate({
+        model: 'googleai/gemini-3.1-flash-image',
+        prompt: [
+          { text: prompt },
+          { media: { url: state.imageBase64! } }
+        ],
+        output: { format: 'media' }
+      });
 
-    if (!media || !media.url) {
-      throw new Error('Image generation failed to return media.');
+      if (!media || !media.url) {
+        throw new Error('Image generation failed to return media.');
+      }
+
+      // T5.6: Re-check if selection changed during generation
+      if (state.selectedHairstyleId !== input.hairstyleId) {
+        return { route: 'STALE' as const, message: 'Hairstyle selection changed during generation. Result discarded.' };
+      }
+
+      state.previewState = 'SUCCESS';
+      // Ensure the generated image has a Data URI prefix for the frontend
+      let finalUrl = media.url;
+      if (!finalUrl.startsWith('data:')) {
+        finalUrl = `data:image/jpeg;base64,${finalUrl}`;
+      }
+      state.previewImageUrl = finalUrl;
+      
+      return { route: 'SUCCESS' as const, message: 'Preview generated successfully.', previewImageUrl: state.previewImageUrl };
+    } catch (err: any) {
+      console.error('Preview error:', err);
+      state.previewState = 'FAILED';
+      state.error = err.message || 'Image generation failed.';
+      return { route: 'FAILED' as const, message: state.error || 'Preview failed' };
+    } finally {
+      state.previewPromise = undefined;
     }
+  })();
 
-    // T5.6: Re-check if selection changed during generation
-    if (state.selectedHairstyleId !== input.hairstyleId) {
-      return { route: 'STALE' as const, message: 'Hairstyle selection changed during generation. Result discarded.' };
-    }
-
-    state.previewState = 'SUCCESS';
-    // Ensure the generated image has a Data URI prefix for the frontend
-    let finalUrl = media.url;
-    if (!finalUrl.startsWith('data:')) {
-      finalUrl = `data:image/jpeg;base64,${finalUrl}`;
-    }
-    state.previewImageUrl = finalUrl;
-    
-    return { route: 'SUCCESS' as const, message: 'Preview generated successfully.', previewImageUrl: state.previewImageUrl };
-  } catch (err: any) {
-    console.error('Preview error:', err);
-    state.previewState = 'FAILED';
-    state.error = err.message || 'Image generation failed.';
-    return { route: 'FAILED' as const, message: state.error || 'Preview failed' };
-  }
+  return await state.previewPromise;
 });
 
 export const previewHandler = async (req: Request, res: Response) => {
