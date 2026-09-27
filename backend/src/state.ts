@@ -3,6 +3,7 @@ export interface RevisionState {
   id: string;
   status: 'READY' | 'ANALYZED' | 'RECOMMENDATIONS_READY' | 'READY_FOR_PREVIEW' | 'STALE' | 'FAILED';
   imageBase64?: string;
+  originalImagePath?: string;
   analysis?: any;
   preferences?: {
     vibe?: string;

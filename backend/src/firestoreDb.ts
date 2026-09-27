@@ -23,6 +23,7 @@ export async function saveRevision(revisionId: string, state: RevisionState): Pr
     selectedHairstyleId,
     previewState,
     error,
+    originalImagePath,
   } = state;
 
   const docData = {
@@ -34,6 +35,7 @@ export async function saveRevision(revisionId: string, state: RevisionState): Pr
     ...(selectedHairstyleId && { selectedHairstyleId }),
     ...(previewState && { previewState }),
     ...(error && { error }),
+    ...(originalImagePath && { originalImagePath }),
     updatedAt: new Date().toISOString(), // Adding a timestamp for good measure
   };
 

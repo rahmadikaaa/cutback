@@ -4,6 +4,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { revisions } from './state';
 import { saveRevision } from './firestoreDb';
+import { uploadOriginalImage } from './cloudStorage';
 
 const isImage = (buffer: Buffer): boolean => {
   if (buffer.length < 12) return false;
@@ -56,8 +57,16 @@ const uploadFlow = ai.defineFlow({
   const state = {
     id: revisionId,
     status: 'READY' as const,
-    imageBase64: `data:${mime};base64,${base64Data}`
+    imageBase64: `data:${mime};base64,${base64Data}`,
+    originalImagePath: undefined as string | undefined
   };
+
+  // Upload original image to Cloud Storage if enabled
+  const storagePath = await uploadOriginalImage(revisionId, buffer, mime);
+  if (storagePath) {
+    state.originalImagePath = storagePath;
+  }
+
   revisions.set(revisionId, state);
 
   // Persist the structured data to Firestore, silently skipping if not configured
