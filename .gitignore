@@ -3,3 +3,10 @@
 .cutback_frontend.log
 .cutback_backend.pid
 .cutback_frontend.pid
+
+# Local / internal project artifacts
+.rtk/
+CLAUDE.md
+backend/catatan.md
+specs/cutback-tasks-v0.3.md
+specs/cutback-tasks-v0.4.md
