@@ -33,7 +33,7 @@ export const smokeTestHandler = async (req: Request, res: Response) => {
 
       // 2. Reasoning node
       const { text } = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
+        model: 'googleai/gemini-2.5-flash',
         prompt: 'Respond with a single word: OK',
       });
       
@@ -53,7 +53,7 @@ export const smokeTestHandler = async (req: Request, res: Response) => {
       status: 'success',
       requestId: reqId,
       stage: 'smoke_test',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       latencyMs: latency,
       result: result
     });

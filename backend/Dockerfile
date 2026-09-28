@@ -38,4 +38,4 @@ EXPOSE 3000
 
 USER cutback
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/src/server.js"]
