@@ -13,6 +13,7 @@ import {
   type RecommendationPreferencesInput,
 } from './api'
 import { get, set } from 'idb-keyval'
+import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -432,7 +433,7 @@ function UploadScreen({
   selectedPhoto: string | null
   setSelectedPhoto: (v: string | null) => void
   onContinue: () => void
-  onUploadSuccess: (revisionId: string) => void
+  onUploadSuccess: (revisionId: string, normalizedUrl?: string) => void
 }) {
   const [error, setError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -459,10 +460,12 @@ function UploadScreen({
         return
       }
 
+      const { blob: normalizedBlob, url: normalizedUrl } = await normalizePhoto(fileToSend);
+
       const result = await uploadPhoto(fileToSend, consent)
 
       if (result.route === 'READY_FOR_ANALYSIS' && result.revisionId) {
-        onUploadSuccess(result.revisionId)
+        onUploadSuccess(result.revisionId, normalizedUrl)
         onContinue()
       } else if (result.route === 'CONSENT_REQUIRED') {
         setError(result.message || 'Consent is required for AI processing.')
@@ -2036,12 +2039,140 @@ function MyHaircutsScreen({
   )
 }
 
+let globalFaceDetector: FaceDetector | null = null;
+
+async function getMediapipeFaceDetector() {
+  if (globalFaceDetector) return globalFaceDetector;
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+  );
+  globalFaceDetector = await FaceDetector.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+      delegate: "GPU"
+    },
+    runningMode: "IMAGE"
+  });
+  return globalFaceDetector;
+}
+
+async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, url: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = async () => {
+      console.log('--- DEBUG: normalizePhoto ---');
+      console.log('Original image dimensions:', { width: img.width, height: img.height });
+
+      let faceBox: any = null;
+      let usedFaceDetector = false;
+      
+      try {
+        console.log('Initializing MediaPipe FaceDetector...');
+        const detector = await getMediapipeFaceDetector();
+        const detections = detector.detect(img);
+        
+        console.log('MediaPipe FaceDetector found faces:', detections.detections.length);
+        if (detections.detections.length > 0) {
+          const det = detections.detections[0];
+          if (det.boundingBox) {
+            faceBox = {
+              x: det.boundingBox.originX,
+              y: det.boundingBox.originY,
+              width: det.boundingBox.width,
+              height: det.boundingBox.height
+            };
+            usedFaceDetector = true;
+            console.log('Detected face bounding box:', faceBox);
+          }
+        }
+      } catch (e) {
+        console.warn('MediaPipe FaceDetector failed:', e);
+      }
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas error'));
+
+      // Determine face coordinates (real or heuristic)
+      let faceW, faceH, faceX, faceY;
+      if (faceBox) {
+        faceW = faceBox.width;
+        faceH = faceBox.height;
+        faceX = faceBox.x;
+        faceY = faceBox.y;
+      } else {
+        // Fallback: assume face is in upper center, ~35% of the shorter dimension
+        const minDim = Math.min(img.width, img.height);
+        faceW = minDim * 0.35;
+        faceH = faceW * 1.25;
+        faceX = (img.width - faceW) / 2;
+        faceY = img.height * 0.15; // typically face is near the top
+        console.log('Using heuristic face box:', { x: faceX, y: faceY, width: faceW, height: faceH });
+      }
+
+      // Calculate tight head crop (1.4x face width, 2.1x face height)
+      // Top margin: 80% face height (for hair)
+      // Bottom margin: 30% face height (for neck)
+      
+      let tightW = faceW * 1.4;
+      let tightH = faceH * 2.1; 
+      let tightX = (faceX + faceW / 2) - (tightW / 2);
+      let tightY = faceY - (faceH * 0.8);
+      
+      console.log('tightCrop initial:', { x: tightX, y: tightY, width: tightW, height: tightH });
+
+      // Strict boundary clamp (do not expand, just cut off what's outside the image)
+      if (tightX < 0) {
+        tightW += tightX; // reduce width by the amount it was out of bounds
+        tightX = 0;
+      }
+      if (tightY < 0) {
+        tightH += tightY;
+        tightY = 0;
+      }
+      if (tightX + tightW > img.width) {
+        tightW = img.width - tightX;
+      }
+      if (tightY + tightH > img.height) {
+        tightH = img.height - tightY;
+      }
+      
+      console.log('Final tightCrop applied:', { x: tightX, y: tightY, width: tightW, height: tightH });
+
+      // We use the tight crop dimensions directly for the canvas. 
+      // The CSS object-fit: cover in the UI will handle displaying it in a 3:4 box if needed.
+      canvas.width = tightW;
+      canvas.height = tightH;
+      console.log('Final canvas (normalizedPhoto) dimensions:', { width: canvas.width, height: canvas.height });
+
+      ctx.drawImage(img, tightX, tightY, tightW, tightH, 0, 0, tightW, tightH);
+      
+      // Save debug snapshot to window for manual inspection in console if needed
+      (window as any).__lastDebugCropCanvas = canvas;
+
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('Blob error'));
+        resolve({ blob, url: URL.createObjectURL(blob) });
+      }, 'image/jpeg', 0.9);
+    };
+    img.onerror = reject;
+    if (typeof fileOrUrl === 'string') {
+      img.src = fileOrUrl;
+    } else {
+      img.src = URL.createObjectURL(fileOrUrl);
+    }
+  });
+}
+
 // ── Main App ───────────────────────────────────────────────────────────────
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home')
 
+
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
+  const [normalizedPhoto, setNormalizedPhoto] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
   const [revisionId, setRevisionId] = useState<string | null>(null)
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null)
@@ -2075,6 +2206,7 @@ export default function App() {
   }, [])
 
   const photo = selectedPhoto ?? portrait1
+  const analysisPhoto = normalizedPhoto ?? photo
   const currentChosenHairstyle = recommendations[chosenRec ?? 0] ?? HAIRSTYLES[0]
 
   function handleSave() {
@@ -2184,6 +2316,7 @@ export default function App() {
 
   function resetFlow() {
     setSelectedPhoto(null)
+    setNormalizedPhoto(null)
     setConsent(false)
     setRevisionId(null)
     setAnalysisData(null)
@@ -2226,14 +2359,17 @@ export default function App() {
           setConsent={setConsent}
           selectedPhoto={selectedPhoto}
           setSelectedPhoto={setSelectedPhoto}
-          onUploadSuccess={(id) => setRevisionId(id)}
+          onUploadSuccess={(id, normUrl) => {
+            setRevisionId(id)
+            if (normUrl) setNormalizedPhoto(normUrl)
+          }}
           onContinue={() => setScreen('analysis-loading')}
         />
       )}
 
       {screen === 'analysis-loading' && (
         <AnalysisLoadingScreen
-          photo={photo}
+          photo={analysisPhoto}
           revisionId={revisionId}
           onComplete={(data) => {
             setAnalysisData(data)
@@ -2248,7 +2384,7 @@ export default function App() {
 
       {screen === 'analysis-failure' && (
         <AnalysisFailureScreen
-          photo={photo}
+          photo={analysisPhoto}
           errorMessage={analysisError}
           onRetry={() => setScreen('analysis-loading')}
           onBack={() => setScreen('upload')}
@@ -2257,7 +2393,7 @@ export default function App() {
 
       {screen === 'analysis-results' && (
         <AnalysisResultsScreen
-          photo={photo}
+          photo={analysisPhoto}
           analysisData={analysisData}
           onPreferences={() => setScreen('preferences')}
           onRecommendations={() => loadRecommendations(prefs)}
