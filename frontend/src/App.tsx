@@ -351,6 +351,7 @@ function GhostBtn({
 
 function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircuts: () => void }) {
   const [phase, setPhase] = useState(0)
+  const [isJourneyMinimized, setIsJourneyMinimized] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setPhase(p => (p + 1) % 3), 2800)
@@ -361,8 +362,8 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
 
   return (
     <div className="screen-enter min-h-dvh flex flex-col relative overflow-hidden">
-      <div className="absolute inset-0">
-        <img src={portrait2} alt="" aria-hidden className="w-full h-full object-cover object-top" />
+      <div className="absolute inset-0" style={{ background: '#0b1728' }}>
+        <img src={portrait2} alt="" aria-hidden className="h-[92%] w-full object-cover object-top" />
         <div
           className="absolute inset-0"
           style={{ background: 'linear-gradient(to bottom, rgba(8,12,20,0.28) 0%, rgba(8,12,20,0.06) 22%, rgba(8,12,20,0.72) 58%, rgba(8,12,20,0.98) 100%)' }}
@@ -374,6 +375,119 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
         <div>
           <p className="text-xs tracking-[0.26em] uppercase mb-3" style={{ color: '#c9a96e', letterSpacing: '0.22em' }}>Cutback</p>
         </div>
+
+        {/* Transformation journey */}
+        <aside
+          className={`absolute right-0 top-[162px] overflow-hidden rounded-l-xl border-l transition-[width] duration-[240ms] ease-out ${
+            isJourneyMinimized ? 'w-[68px]' : 'w-[142px]'
+          }`}
+          aria-label="Transformation journey"
+          style={{
+            background: isJourneyMinimized ? 'transparent' : 'linear-gradient(90deg, rgba(8,12,20,0.5), rgba(8,12,20,0.86))',
+            borderColor: isJourneyMinimized ? 'transparent' : 'rgba(201,169,110,0.18)',
+            backdropFilter: isJourneyMinimized ? 'none' : 'blur(3px)',
+          }}
+        >
+          <button
+            type="button"
+            className={`block w-full ${isJourneyMinimized ? 'py-1' : 'px-3 pb-2 pt-3 text-left'}`}
+            onClick={() => setIsJourneyMinimized(minimized => !minimized)}
+            aria-expanded={!isJourneyMinimized}
+            aria-label={isJourneyMinimized ? 'Expand Transformation Journey' : 'Minimize Transformation Journey'}
+          >
+            {isJourneyMinimized ? (
+              <span className="block w-full">
+                {[
+                  { number: '01', label: 'Discover' },
+                  { number: '02', label: 'Define' },
+                  { number: '03', label: 'Visualize' },
+                  { number: '04', label: 'Ready' },
+                ].map((step, i) => {
+                  const isActive = i === 0
+                  return (
+                    <span key={step.number} className="relative flex h-12 w-full flex-col items-center">
+                      <span
+                        className="relative z-10 flex h-5 w-5 items-center justify-center rounded-full text-[7px] font-semibold"
+                        style={{
+                          background: isActive ? '#c9a96e' : 'rgba(8,12,20,0.58)',
+                          border: isActive ? '1px solid #c9a96e' : '1px solid rgba(240,235,224,0.46)',
+                          color: isActive ? '#080c14' : 'rgba(240,235,224,0.7)',
+                          boxShadow: isActive ? '0 0 7px rgba(201,169,110,0.18)' : 'none',
+                        }}
+                      >
+                        {step.number}
+                      </span>
+                      <span
+                        className="relative z-10 mt-0.5 block text-center text-[10px] font-medium leading-4"
+                        style={{ color: '#f0ebe0', textShadow: '0 1px 5px rgba(8,12,20,0.9)' }}
+                      >
+                        {step.label}
+                      </span>
+                      {i < 3 && (
+                        <span
+                          className="absolute left-1/2 top-[38px] h-[10px] w-px -translate-x-1/2"
+                          style={{ background: 'rgba(240,235,224,0.32)' }}
+                          aria-hidden
+                        />
+                      )}
+                    </span>
+                  )
+                })}
+              </span>
+            ) : (
+              <span className="block w-[118px]">
+                <span
+                  className="mb-3 block text-[10px] font-medium uppercase leading-[1.35]"
+                  style={{ color: 'rgba(240,235,224,0.62)', letterSpacing: '0.16em' }}
+                >
+                  Transformation
+                  <br />
+                  Journey
+                </span>
+                <span className="block">
+                  {[
+                    { number: '01', label: 'Discover', detail: 'Upload & Analyse' },
+                    { number: '02', label: 'Define', detail: 'Recommend' },
+                    { number: '03', label: 'Visualize', detail: 'Preview' },
+                    { number: '04', label: 'Ready', detail: 'Brief' },
+                  ].map((step, i) => {
+                    const isActive = i === 0
+                    return (
+                      <span key={step.number} className="relative flex min-h-[44px] gap-2.5">
+                        <span className="relative flex w-[22px] flex-shrink-0 justify-center">
+                          <span
+                            className="relative z-10 flex h-[22px] w-[22px] items-center justify-center rounded-full text-[8px] font-semibold"
+                            style={{
+                              background: isActive ? '#c9a96e' : 'rgba(8,12,20,0.34)',
+                              border: isActive ? '1px solid #c9a96e' : '1px solid rgba(240,235,224,0.4)',
+                              color: isActive ? '#080c14' : 'rgba(240,235,224,0.62)',
+                              boxShadow: isActive ? '0 0 8px rgba(201,169,110,0.2)' : 'none',
+                            }}
+                          >
+                            {step.number}
+                          </span>
+                          {i < 3 && (
+                            <span
+                              className="absolute top-[22px] h-[22px] w-px"
+                              style={{ background: 'rgba(240,235,224,0.24)' }}
+                              aria-hidden
+                            />
+                          )}
+                        </span>
+                        <span className="-mt-0.5 block min-w-0">
+                          <span className="block text-xs font-semibold leading-[17px]" style={{ color: '#f0ebe0' }}>{step.label}</span>
+                          <span className="block whitespace-nowrap text-[10px] leading-[15px]" style={{ color: 'rgba(240,235,224,0.58)' }}>
+                            {step.detail}
+                          </span>
+                        </span>
+                      </span>
+                    )
+                  })}
+                </span>
+              </span>
+            )}
+          </button>
+        </aside>
 
         {/* Hero */}
         <div>
@@ -398,16 +512,6 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
           <p className="text-xs mb-8" style={{ color: 'rgba(240,235,224,0.38)', letterSpacing: '0.06em' }}>
             Identity stays. Hair transforms.
           </p>
-
-          {/* Journey steps — compact */}
-          <div className="flex items-center gap-1.5 mb-8 overflow-hidden">
-            {['Upload', 'Analyse', 'Recommend', 'Preview', 'Brief'].map((step, i) => (
-              <div key={step} className="flex items-center gap-1.5 min-w-0">
-                <span className="text-xs truncate" style={{ color: 'rgba(240,235,224,0.35)', fontSize: 10 }}>{step}</span>
-                {i < 4 && <span style={{ color: 'rgba(201,169,110,0.4)', fontSize: 10 }}>→</span>}
-              </div>
-            ))}
-          </div>
 
           <PrimaryBtn onClick={onStart}>Make It Real</PrimaryBtn>
           <div className="mt-3">
