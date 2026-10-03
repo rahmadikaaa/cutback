@@ -352,11 +352,29 @@ function GhostBtn({
 function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircuts: () => void }) {
   const [phase, setPhase] = useState(0)
   const [isJourneyMinimized, setIsJourneyMinimized] = useState(false)
+  const journeyRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const t = setInterval(() => setPhase(p => (p + 1) % 3), 2800)
     return () => clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    if (isJourneyMinimized) return
+
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (journeyRef.current && !journeyRef.current.contains(event.target as Node)) {
+        setIsJourneyMinimized(true)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [isJourneyMinimized])
 
   const transformWords = ['sharper', 'bolder', 'cleaner']
 
@@ -378,6 +396,7 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
 
         {/* Transformation journey */}
         <aside
+          ref={journeyRef}
           className={`absolute right-0 top-[162px] overflow-hidden rounded-l-xl border-l transition-[width] duration-[240ms] ease-out ${
             isJourneyMinimized ? 'w-[68px]' : 'w-[142px]'
           }`}
@@ -391,12 +410,28 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
           <button
             type="button"
             className={`block w-full ${isJourneyMinimized ? 'py-1' : 'px-3 pb-2 pt-3 text-left'}`}
-            onClick={() => setIsJourneyMinimized(minimized => !minimized)}
+            onClick={() => {
+              if (isJourneyMinimized) {
+                setIsJourneyMinimized(false)
+              }
+            }}
             aria-expanded={!isJourneyMinimized}
-            aria-label={isJourneyMinimized ? 'Expand Transformation Journey' : 'Minimize Transformation Journey'}
+            aria-label={isJourneyMinimized ? 'Expand Transformation Journey' : 'Transformation Journey'}
           >
             {isJourneyMinimized ? (
               <span className="block w-full">
+                <span
+                  className="mb-2 block px-0.5 text-center text-[7.5px] font-medium uppercase leading-[1.25]"
+                  style={{
+                    color: 'rgba(240,235,224,0.65)',
+                    letterSpacing: '0.06em',
+                    textShadow: '0 1px 4px rgba(8,12,20,0.9)',
+                  }}
+                >
+                  Transformation
+                  <br />
+                  Journey
+                </span>
                 {[
                   { number: '01', label: 'Discover' },
                   { number: '02', label: 'Define' },
