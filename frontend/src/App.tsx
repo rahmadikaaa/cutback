@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import portrait1 from './assets/portrait-1.jpg'
 import portrait2 from './assets/portrait-2.png'
 import portrait3 from './assets/portrait-3.png'
+import calmStudioSelfie from './assets/Calm Studio Selfie Portrait.png'
+import blackCapSelfie from './assets/Black Cap Selfie Portrait.png'
 import {
   uploadPhoto,
   analyzePhoto,
@@ -90,8 +92,8 @@ function mapBackendRecommendations(
       rec.stylingEffort === 'low'
         ? 'Air-dry or minimal styling'
         : rec.stylingEffort === 'high'
-        ? '10–15 min — fully styled with product'
-        : '5–10 min — light hold product'
+          ? '10–15 min — fully styled with product'
+          : '5–10 min — light hold product'
 
     const limitation =
       rec.constraints && rec.constraints.length > 0
@@ -397,9 +399,8 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
         {/* Transformation journey */}
         <aside
           ref={journeyRef}
-          className={`absolute right-0 top-[162px] overflow-hidden rounded-l-xl border-l transition-[width] duration-[240ms] ease-out ${
-            isJourneyMinimized ? 'w-[68px]' : 'w-[142px]'
-          }`}
+          className={`absolute right-0 top-[162px] overflow-hidden rounded-l-xl border-l transition-[width] duration-[240ms] ease-out ${isJourneyMinimized ? 'w-[68px]' : 'w-[142px]'
+            }`}
           aria-label="Transformation journey"
           style={{
             background: isJourneyMinimized ? 'transparent' : 'linear-gradient(90deg, rgba(8,12,20,0.5), rgba(8,12,20,0.86))',
@@ -625,58 +626,65 @@ function UploadScreen({
       <div className="flex items-center gap-3 px-5 pt-12 pb-5 flex-shrink-0">
         <BackBtn onBack={onBack} />
         <div>
-          <h2 className="font-display text-2xl" style={{ color: 'var(--foreground)' }}>Your Photo</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>The start of your transformation</p>
+          <h2 className="font-display text-2xl" style={{ color: 'var(--foreground)' }}>Take Your Photo</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Capture your hair clearly</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-5">
         {/* Photo guidance */}
         <div className="rounded-xl p-4" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
-          <p className="text-xs font-medium mb-2 uppercase tracking-wide" style={{ color: '#c9a96e', fontSize: 10 }}>Photo Guide</p>
-          <ul className="text-sm space-y-1" style={{ color: 'var(--secondary-foreground)' }}>
-            {['One person, facing forward', 'Face and hair clearly visible', 'Even lighting — no harsh shadows', 'Recent photo works best'].map(g => (
-              <li key={g} className="flex gap-1.5">
-                <span style={{ color: 'rgba(240,235,224,0.3)' }}>·</span> {g}
+          <p className="text-[10px] font-bold mb-3 uppercase tracking-widest" style={{ color: '#c9a96e' }}>Photo Guide</p>
+          <ul className="text-sm space-y-2" style={{ color: 'var(--secondary-foreground)' }}>
+            {[
+              'One person, facing forward',
+              'Show your full hair (top, sides, front)',
+              'Good lighting',
+              'No hat, no sunglasses',
+              'Use a recent photo'
+            ].map(g => (
+              <li key={g} className="flex gap-2 items-start">
+                <span className="mt-1" style={{ color: 'rgba(201,169,110,0.5)', fontSize: '8px' }}>●</span> <span className="leading-snug">{g}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* Upload status indicator */}
-        <div className="flex items-center gap-2">
-          <SimBadge label="Backend Upload" />
-          <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Select a sample photo or upload below</span>
-        </div>
-
-        {/* Sample photos */}
+        {/* Example section */}
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Sample Photos</p>
-          <div className="grid grid-cols-3 gap-2.5">
-            {samples.map((photo, i) => (
-              <button
-                key={i}
-                onClick={() => { setSelectedPhoto(photo); setSelectedFile(null); setError(null) }}
-                aria-label={`Select sample photo ${i + 1}`}
-                className="relative rounded-xl overflow-hidden transition-all active:scale-95"
-                style={{
-                  aspectRatio: '1',
-                  outline: selectedPhoto === photo ? '2px solid #c9a96e' : '2px solid transparent',
-                  outlineOffset: 2,
-                }}
-              >
-                <img src={photo} alt={`Sample ${i + 1}`} className="w-full h-full object-cover object-top" />
-                {selectedPhoto === photo && (
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(201,169,110,0.18)' }}>
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: '#c9a96e' }}>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#080c14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  </div>
-                )}
-              </button>
-            ))}
+          <p className="text-[10px] uppercase font-bold tracking-widest mb-3" style={{ color: 'var(--muted-foreground)' }}>Example</p>
+          <div className="flex gap-3">
+            {/* GOOD */}
+            <div className="flex-1">
+              <div className="relative rounded-xl overflow-hidden mb-2" style={{ aspectRatio: '3/4', border: '1px solid rgba(240,235,224,0.1)' }}>
+                <img src={calmStudioSelfie} alt="Good example" className="w-full h-full object-cover object-top" />
+                <div className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: '#4caf50', border: '1.5px solid rgba(8,12,20,0.4)' }}>
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold tracking-wider mb-1" style={{ color: '#4caf50' }}>GOOD</p>
+              <ul className="text-[10px] space-y-0.5 leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+                <li>Face facing forward</li>
+                <li>Full hair visible</li>
+                <li>Hair is not covered</li>
+                <li>Good lighting</li>
+              </ul>
+            </div>
+
+            {/* BAD */}
+            <div className="flex-1">
+              <div className="relative rounded-xl overflow-hidden mb-2" style={{ aspectRatio: '3/4', border: '1px solid rgba(240,235,224,0.1)' }}>
+                <img src={blackCapSelfie} alt="Bad example" className="w-full h-full object-cover object-top opacity-50 grayscale" />
+                <div className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: '#e57373', border: '1.5px solid rgba(8,12,20,0.4)' }}>
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 3L9 9M9 3L3 9" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold tracking-wider mb-1" style={{ color: '#e57373' }}>BAD</p>
+              <ul className="text-[10px] space-y-0.5 leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+                <li>Hair covered</li>
+                <li>Poor framing / hair not visible</li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -917,37 +925,37 @@ function AnalysisResultsScreen({
 }) {
   const displayObs = analysisData?.attributes
     ? [
-        {
-          label: 'Face shape',
-          value: formatAttrValue(analysisData.attributes.faceShape),
-          status: analysisData.attributes.faceShape === 'unknown' ? 'unknown' : 'observed',
-        },
-        {
-          label: 'Hair pattern',
-          value: formatAttrValue(analysisData.attributes.hairType),
-          status: analysisData.attributes.hairType === 'unknown' ? 'unknown' : 'observed',
-        },
-        {
-          label: 'Current length',
-          value: formatAttrValue(analysisData.attributes.hairLength),
-          status: analysisData.attributes.hairLength === 'unknown' ? 'unknown' : 'observed',
-        },
-        {
-          label: 'Hairline',
-          value: formatAttrValue(analysisData.attributes.hairLine),
-          status: analysisData.attributes.hairLine === 'unknown' ? 'unknown' : 'observed',
-        },
-        {
-          label: 'Hair thickness',
-          value: formatAttrValue(analysisData.attributes.hairThickness),
-          status: analysisData.attributes.hairThickness === 'unknown' ? 'unknown' : 'observed',
-        },
-        {
-          label: 'Visual Suitability',
-          value: analysisData.visualSuitability.isValid ? 'Verified' : 'Flagged',
-          status: analysisData.visualSuitability.isValid ? 'observed' : 'unknown',
-        },
-      ]
+      {
+        label: 'Face shape',
+        value: formatAttrValue(analysisData.attributes.faceShape),
+        status: analysisData.attributes.faceShape === 'unknown' ? 'unknown' : 'observed',
+      },
+      {
+        label: 'Hair pattern',
+        value: formatAttrValue(analysisData.attributes.hairType),
+        status: analysisData.attributes.hairType === 'unknown' ? 'unknown' : 'observed',
+      },
+      {
+        label: 'Current length',
+        value: formatAttrValue(analysisData.attributes.hairLength),
+        status: analysisData.attributes.hairLength === 'unknown' ? 'unknown' : 'observed',
+      },
+      {
+        label: 'Hairline',
+        value: formatAttrValue(analysisData.attributes.hairLine),
+        status: analysisData.attributes.hairLine === 'unknown' ? 'unknown' : 'observed',
+      },
+      {
+        label: 'Hair thickness',
+        value: formatAttrValue(analysisData.attributes.hairThickness),
+        status: analysisData.attributes.hairThickness === 'unknown' ? 'unknown' : 'observed',
+      },
+      {
+        label: 'Visual Suitability',
+        value: analysisData.visualSuitability.isValid ? 'Verified' : 'Flagged',
+        status: analysisData.visualSuitability.isValid ? 'observed' : 'unknown',
+      },
+    ]
     : ANALYSIS_OBS
 
   return (
@@ -1299,6 +1307,48 @@ function RecommendationsScreen({
       {/* Info + CTAs */}
       <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6">
         {/* CONVERGE: grounded reasoning chain */}
+        {/* Transformation Journey Card */}
+        <div className="mb-6 rounded-xl p-4 relative" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
+          <div className="mb-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--foreground)' }}>✦ YOUR TRANSFORMATION</h3>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>From your current hair to your next look.</p>
+          </div>
+
+          <div className="mb-6 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.7)' }}>Your Hair ✓</span>
+              <span className="text-[10px]" style={{ color: 'rgba(240,235,224,0.3)' }}>→</span>
+              <div className="relative flex flex-col items-center">
+                <span className="text-xs font-semibold" style={{ color: '#c9a96e' }}>Find Your Look</span>
+                <span className="text-[8px] font-bold absolute -bottom-3.5" style={{ color: '#c9a96e', letterSpacing: '0.05em' }}>↑ ACTIVE</span>
+              </div>
+              <span className="text-[10px]" style={{ color: 'rgba(240,235,224,0.3)' }}>→</span>
+              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.4)' }}>See Yourself</span>
+            </div>
+
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.4)' }}>Barber Ready</span>
+              <span className="text-[10px]" style={{ color: 'rgba(240,235,224,0.3)' }}>→</span>
+              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.4)' }}>Remember</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              if (hasChosen) onSeePreview()
+              else setChosenRec(safeActiveRec)
+            }}
+            className="w-full py-3 rounded-lg font-medium text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            style={{
+              background: hasChosen ? '#c9a96e' : 'rgba(201,169,110,0.12)',
+              color: hasChosen ? '#080c14' : '#c9a96e',
+              border: hasChosen ? 'none' : '1px solid rgba(201,169,110,0.3)'
+            }}
+          >
+            Continue Journey <span className="text-[10px]">→</span>
+          </button>
+        </div>
+
         <ConvergeChain rec={rec} prefs={prefs} animKey={animKey} />
 
         {/* Effort + limitation row */}
@@ -1860,7 +1910,7 @@ function BarberBriefScreen({
           <button
             className="w-full py-4 rounded-xl font-medium text-base transition-all active:scale-[0.98] mb-3"
             style={{ background: '#c9a96e', color: '#080c14', minHeight: 56, fontFamily: 'var(--font-sans)' }}
-            onClick={() => {}}
+            onClick={() => { }}
           >
             Show My Barber
           </button>
@@ -2205,12 +2255,12 @@ async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, u
 
       let faceBox: any = null;
       let usedFaceDetector = false;
-      
+
       try {
         console.log('Initializing MediaPipe FaceDetector...');
         const detector = await getMediapipeFaceDetector();
         const detections = detector.detect(img);
-        
+
         console.log('MediaPipe FaceDetector found faces:', detections.detections.length);
         if (detections.detections.length > 0) {
           const det = detections.detections[0];
@@ -2228,7 +2278,7 @@ async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, u
       } catch (e) {
         console.warn('MediaPipe FaceDetector failed:', e);
       }
-      
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject(new Error('Canvas error'));
@@ -2253,12 +2303,12 @@ async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, u
       // Calculate tight head crop (1.4x face width, 2.1x face height)
       // Top margin: 80% face height (for hair)
       // Bottom margin: 30% face height (for neck)
-      
+
       let tightW = faceW * 1.4;
-      let tightH = faceH * 2.1; 
+      let tightH = faceH * 2.1;
       let tightX = (faceX + faceW / 2) - (tightW / 2);
       let tightY = faceY - (faceH * 0.8);
-      
+
       console.log('tightCrop initial:', { x: tightX, y: tightY, width: tightW, height: tightH });
 
       // Strict boundary clamp (do not expand, just cut off what's outside the image)
@@ -2276,7 +2326,7 @@ async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, u
       if (tightY + tightH > img.height) {
         tightH = img.height - tightY;
       }
-      
+
       console.log('Final tightCrop applied:', { x: tightX, y: tightY, width: tightW, height: tightH });
 
       // We use the tight crop dimensions directly for the canvas. 
@@ -2286,7 +2336,7 @@ async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, u
       console.log('Final canvas (normalizedPhoto) dimensions:', { width: canvas.width, height: canvas.height });
 
       ctx.drawImage(img, tightX, tightY, tightW, tightH, 0, 0, tightW, tightH);
-      
+
       // Save debug snapshot to window for manual inspection in console if needed
       (window as any).__lastDebugCropCanvas = canvas;
 
@@ -2378,7 +2428,7 @@ export default function App() {
     setChosenRec(hc.hairstyleId)
     setPreviewImageUrl(hc.previewImageUrl || null)
     setPreviewAvail(!!hc.previewImageUrl)
-    
+
     if (hc.rec) {
       setRecommendations(prev => {
         const arr = [...prev]
@@ -2386,7 +2436,7 @@ export default function App() {
         return arr
       })
     }
-    
+
     setScreen('barber-brief')
   }
 
@@ -2397,7 +2447,7 @@ export default function App() {
     setChosenRec(hc.hairstyleId)
     setPreviewImageUrl(hc.previewImageUrl || null)
     setPreviewAvail(!!hc.previewImageUrl)
-    
+
     if (hc.rec) {
       setRecommendations(prev => {
         const arr = [...prev]
@@ -2405,7 +2455,7 @@ export default function App() {
         return arr
       })
     }
-    
+
     setBriefNotes('')
     setScreen('barber-brief')
   }
