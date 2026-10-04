@@ -579,6 +579,7 @@ function UploadScreen({
   const [isUploading, setIsUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const samples = [portrait1, portrait2, portrait3]
 
   async function handleContinue() {
@@ -623,19 +624,19 @@ function UploadScreen({
 
   return (
     <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>
-      <div className="flex items-center gap-3 px-5 pt-12 pb-5 flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 md:px-5 pt-3 md:pt-12 pb-1 md:pb-5 flex-shrink-0">
         <BackBtn onBack={onBack} />
         <div>
-          <h2 className="font-display text-2xl" style={{ color: 'var(--foreground)' }}>Take Your Photo</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Capture your hair clearly</p>
+          <h2 className="font-display text-xl md:text-2xl" style={{ color: 'var(--foreground)' }}>Take Your Photo</h2>
+          <p className="text-[10px] md:text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Capture your hair clearly</p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-5">
+      <div className="flex-1 overflow-y-auto px-4 md:px-5 pb-2 md:pb-8 flex flex-col gap-2.5 md:gap-5">
         {/* Photo guidance */}
-        <div className="rounded-xl p-4" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
-          <p className="text-[10px] font-bold mb-3 uppercase tracking-widest" style={{ color: '#c9a96e' }}>Photo Guide</p>
-          <ul className="text-sm space-y-2" style={{ color: 'var(--secondary-foreground)' }}>
+        <div className="rounded-xl px-3 py-2 md:p-4" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
+          <p className="text-[10px] md:text-[10px] font-bold mb-1 md:mb-3 uppercase tracking-widest" style={{ color: '#c9a96e' }}>Photo Guide</p>
+          <ul className="text-xs md:text-sm space-y-0.5 md:space-y-2" style={{ color: 'var(--secondary-foreground)' }}>
             {[
               'One person, facing forward',
               'Show your full hair (top, sides, front)',
@@ -651,19 +652,19 @@ function UploadScreen({
         </div>
 
         {/* Example section */}
-        <div>
-          <p className="text-[10px] uppercase font-bold tracking-widest mb-3" style={{ color: 'var(--muted-foreground)' }}>Example</p>
-          <div className="flex gap-3">
+        <div className={selectedPhoto ? "hidden md:block" : "block"}>
+          <p className="text-[9px] md:text-[10px] uppercase font-bold tracking-widest mb-1.5 md:mb-3" style={{ color: 'var(--muted-foreground)' }}>Example</p>
+          <div className="flex gap-2 md:gap-3 px-3 md:px-0">
             {/* GOOD */}
             <div className="flex-1">
-              <div className="relative rounded-xl overflow-hidden mb-2" style={{ aspectRatio: '3/4', border: '1px solid rgba(240,235,224,0.1)' }}>
-                <img src={calmStudioSelfie} alt="Good example" className="w-full h-full object-cover object-top" />
-                <div className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: '#4caf50', border: '1.5px solid rgba(8,12,20,0.4)' }}>
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <div className="relative rounded-xl overflow-hidden mb-1 md:mb-2" style={{ aspectRatio: '3/4', border: '1px solid rgba(240,235,224,0.1)' }}>
+                <img src={calmStudioSelfie} alt="Good example" className="w-full h-full object-cover object-top scale-[1.25] origin-[50%_10%] md:scale-100 md:origin-center" />
+                <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center" style={{ background: '#4caf50', border: '1px solid rgba(8,12,20,0.4)' }}>
+                  <svg className="w-2 h-2 md:w-2.5 md:h-2.5" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
               </div>
-              <p className="text-[10px] font-bold tracking-wider mb-1" style={{ color: '#4caf50' }}>GOOD</p>
-              <ul className="text-[10px] space-y-0.5 leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+              <p className="text-[9px] md:text-[10px] font-bold tracking-wider mb-0 md:mb-1" style={{ color: '#4caf50' }}>GOOD</p>
+              <ul className="text-[9px] md:text-[10px] space-y-0 md:space-y-0.5 leading-tight md:leading-snug" style={{ color: 'var(--muted-foreground)' }}>
                 <li>Face facing forward</li>
                 <li>Full hair visible</li>
                 <li>Hair is not covered</li>
@@ -673,14 +674,14 @@ function UploadScreen({
 
             {/* BAD */}
             <div className="flex-1">
-              <div className="relative rounded-xl overflow-hidden mb-2" style={{ aspectRatio: '3/4', border: '1px solid rgba(240,235,224,0.1)' }}>
-                <img src={blackCapSelfie} alt="Bad example" className="w-full h-full object-cover object-top opacity-50 grayscale" />
-                <div className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: '#e57373', border: '1.5px solid rgba(8,12,20,0.4)' }}>
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 3L9 9M9 3L3 9" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <div className="relative rounded-xl overflow-hidden mb-1 md:mb-2" style={{ aspectRatio: '3/4', border: '1px solid rgba(240,235,224,0.1)' }}>
+                <img src={blackCapSelfie} alt="Bad example" className="w-full h-full object-cover object-top opacity-50 grayscale scale-[1.25] origin-[50%_10%] md:scale-100 md:origin-center" />
+                <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center" style={{ background: '#e57373', border: '1px solid rgba(8,12,20,0.4)' }}>
+                  <svg className="w-2 h-2 md:w-2.5 md:h-2.5" viewBox="0 0 12 12" fill="none"><path d="M3 3L9 9M9 3L3 9" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
               </div>
-              <p className="text-[10px] font-bold tracking-wider mb-1" style={{ color: '#e57373' }}>BAD</p>
-              <ul className="text-[10px] space-y-0.5 leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+              <p className="text-[9px] md:text-[10px] font-bold tracking-wider mb-0 md:mb-1" style={{ color: '#e57373' }}>BAD</p>
+              <ul className="text-[9px] md:text-[10px] space-y-0 md:space-y-0.5 leading-tight md:leading-snug" style={{ color: 'var(--muted-foreground)' }}>
                 <li>Hair covered</li>
                 <li>Poor framing / hair not visible</li>
               </ul>
@@ -688,11 +689,25 @@ function UploadScreen({
           </div>
         </div>
 
-        {/* Upload own */}
+        {/* Hidden inputs */}
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
+          className="sr-only"
+          onChange={e => {
+            const file = e.target.files?.[0]
+            if (file) {
+              setSelectedFile(file)
+              setSelectedPhoto(URL.createObjectURL(file))
+              setError(null)
+            }
+          }}
+        />
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
           capture="user"
           className="sr-only"
           onChange={e => {
@@ -704,45 +719,86 @@ function UploadScreen({
             }
           }}
         />
+
+        {/* Desktop Button */}
         <button
           onClick={() => fileRef.current?.click()}
-          className="w-full py-3.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
-          style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', minHeight: 48 }}
+          className={`hidden md:block w-full py-3.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98] min-h-[48px]`}
+          style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
         >
           + Upload or Take Your Own Photo
         </button>
 
+        {/* Mobile Buttons (Before Upload) */}
+        <div className={`flex gap-2 w-full ${selectedPhoto ? 'hidden' : 'flex md:hidden'}`}>
+          <button
+            onClick={() => cameraRef.current?.click()}
+            className="flex-1 py-2 rounded-xl text-xs font-medium transition-all active:scale-[0.98] min-h-[40px]"
+            style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
+          >
+            Take Photo
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 py-2 rounded-xl text-xs font-medium transition-all active:scale-[0.98] min-h-[40px]"
+            style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
+          >
+            Gallery
+          </button>
+        </div>
+
         {/* Preview if selected */}
         {selectedPhoto && (
-          <div className="rounded-xl overflow-hidden" style={{ height: 200, border: '1px solid var(--border)' }}>
-            <img src={selectedPhoto} alt="Selected photo" className="w-full h-full object-cover object-top" />
+          <div className="flex flex-col">
+            <p className="text-[9px] md:hidden uppercase font-bold tracking-widest mb-1.5 text-center md:text-left" style={{ color: 'var(--muted-foreground)' }}>Your Photo</p>
+            <div className="w-full max-w-[240px] mx-auto md:max-w-none md:mx-0 rounded-xl overflow-hidden aspect-[4/5] md:aspect-auto md:h-[200px]" style={{ border: '1px solid var(--border)' }}>
+              <img src={selectedPhoto} alt="Selected photo" className="w-full h-full object-cover object-center md:object-top" />
+            </div>
+
+            {/* Mobile Change Photo */}
+            <div className="mt-2.5 flex md:hidden gap-2">
+              <button
+                onClick={() => cameraRef.current?.click()}
+                className="flex-1 py-2.5 rounded-xl text-xs font-medium transition-all active:scale-[0.98]"
+                style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
+              >
+                Retake
+              </button>
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="flex-1 py-2.5 rounded-xl text-xs font-medium transition-all active:scale-[0.98]"
+                style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
+              >
+                Gallery
+              </button>
+            </div>
           </div>
         )}
 
         {/* Consent */}
         <div
-          className="rounded-xl p-4"
+          className="rounded-xl px-3 py-2 md:p-4"
           style={{ background: 'var(--secondary)', border: error && !consent ? '1px solid rgba(229,115,115,0.45)' : '1px solid var(--border)' }}
         >
-          <label className="flex gap-3 cursor-pointer">
+          <label className="flex gap-2 md:gap-3 cursor-pointer">
             <div className="relative mt-0.5 flex-shrink-0" onClick={() => { setConsent(!consent); setError(null) }}>
               <div
-                className="checkbox-inner w-5 h-5 rounded flex items-center justify-center"
+                className="checkbox-inner w-4 h-4 md:w-5 md:h-5 rounded flex items-center justify-center"
                 style={{
                   background: consent ? '#c9a96e' : 'transparent',
                   border: consent ? '2px solid #c9a96e' : '2px solid rgba(240,235,224,0.28)',
                 }}
               >
                 {consent && (
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                    <path d="M2 5.5L4.5 8L9 3" stroke="#080c14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg className="w-2 h-2 md:w-2.5 md:h-2.5" viewBox="0 0 11 11" fill="none">
+                    <path d="M2 5.5L4.5 8L9 3" stroke="#080c14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </div>
             </div>
             <div onClick={() => { setConsent(!consent); setError(null) }}>
-              <p className="text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>I agree to photo processing</p>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
+              <p className="text-[11px] md:text-sm font-medium mb-0.5 md:mb-1" style={{ color: 'var(--foreground)' }}>I agree to photo processing</p>
+              <p className="text-[9px] md:text-xs leading-snug md:leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
                 Your photo is used only for haircut recommendations and your personal preview. It is not shared publicly or used for model training.
               </p>
             </div>
@@ -750,14 +806,16 @@ function UploadScreen({
         </div>
 
         {error && (
-          <p className="text-sm flex items-center gap-1.5" style={{ color: '#e57373' }}>
+          <p className="text-xs md:text-sm flex items-center gap-1.5" style={{ color: '#e57373' }}>
             <span>⚠</span> {error}
           </p>
         )}
 
-        <PrimaryBtn onClick={handleContinue} disabled={!selectedPhoto || !consent || isUploading}>
-          {isUploading ? 'Uploading & Validating…' : 'Continue'}
-        </PrimaryBtn>
+        <div className="pb-2 md:pb-0">
+          <PrimaryBtn onClick={handleContinue} disabled={!selectedPhoto || !consent || isUploading}>
+            {isUploading ? 'Uploading & Validating…' : 'Continue'}
+          </PrimaryBtn>
+        </div>
       </div>
     </div>
   )
