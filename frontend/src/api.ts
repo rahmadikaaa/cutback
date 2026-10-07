@@ -38,12 +38,16 @@ export async function uploadPhoto(
   return data
 }
 
+export type ProvenanceSource = 'Observed' | 'Inferred' | 'User-provided' | 'Unknown'
+
+export type ProvenancedAttribute<T> = { value: T; source: ProvenanceSource } | T
+
 export interface AnalysisAttributes {
-  hairLength: 'short' | 'medium' | 'long' | 'unknown'
-  hairType: 'straight' | 'wavy' | 'curly' | 'coily' | 'unknown'
-  hairThickness: 'fine' | 'medium' | 'thick' | 'unknown'
-  hairLine: 'receding' | 'widow_peak' | 'straight' | 'unknown'
-  faceShape: 'oval' | 'round' | 'square' | 'heart' | 'diamond' | 'oblong' | 'unknown'
+  hairLength: ProvenancedAttribute<'short' | 'medium' | 'long' | 'unknown'>
+  hairType: ProvenancedAttribute<'straight' | 'wavy' | 'curly' | 'coily' | 'unknown'>
+  hairThickness: ProvenancedAttribute<'fine' | 'medium' | 'thick' | 'unknown'>
+  hairLine: ProvenancedAttribute<'receding' | 'widow_peak' | 'straight' | 'unknown'>
+  faceShape: ProvenancedAttribute<'oval' | 'round' | 'square' | 'heart' | 'diamond' | 'oblong' | 'unknown'>
 }
 
 export interface AnalysisData {
@@ -89,6 +93,18 @@ export interface BackendRecommendationItem {
   constraints: string[]
   isBestMatch: boolean
   bestMatchReason?: string
+  feasibility?: 'Ready Now' | 'Possible with Adjustment' | 'Transition Required' | 'Not Currently Realistic'
+  transitionGuidance?: string
+  barberBrief?: {
+    top?: string
+    sides?: string
+    back?: string
+    fringe?: string
+    styling?: string
+    maintenance?: string
+    preserve?: string
+    avoid?: string
+  }
 }
 
 export interface RecommendationPreferencesInput {

@@ -6,6 +6,8 @@ import { revisions } from './state';
 import { saveRevision } from './firestoreDb';
 import crypto from 'crypto';
 
+const ProvenanceSchema = z.enum(['Observed', 'Inferred', 'User-provided', 'Unknown']);
+
 // T3.1: Analysis Schema
 export const AnalysisSchema = z.object({
   visualSuitability: z.object({
@@ -13,11 +15,11 @@ export const AnalysisSchema = z.object({
     reason: z.string().optional()
   }),
   attributes: z.object({
-    hairLength: z.enum(['short', 'medium', 'long', 'unknown']),
-    hairType: z.enum(['straight', 'wavy', 'curly', 'coily', 'unknown']),
-    hairThickness: z.enum(['fine', 'medium', 'thick', 'unknown']),
-    hairLine: z.enum(['receding', 'widow_peak', 'straight', 'unknown']),
-    faceShape: z.enum(['oval', 'round', 'square', 'heart', 'diamond', 'oblong', 'unknown']),
+    hairLength: z.object({ value: z.enum(['short', 'medium', 'long', 'unknown']), source: ProvenanceSchema }),
+    hairType: z.object({ value: z.enum(['straight', 'wavy', 'curly', 'coily', 'unknown']), source: ProvenanceSchema }),
+    hairThickness: z.object({ value: z.enum(['fine', 'medium', 'thick', 'unknown']), source: ProvenanceSchema }),
+    hairLine: z.object({ value: z.enum(['receding', 'widow_peak', 'straight', 'unknown']), source: ProvenanceSchema }),
+    faceShape: z.object({ value: z.enum(['oval', 'round', 'square', 'heart', 'diamond', 'oblong', 'unknown']), source: ProvenanceSchema }),
   }).optional()
 });
 
@@ -61,7 +63,12 @@ export const analysisFlow = ai.defineFlow({
       2. DO NOT infer or mention identity, ethnicity, personality, or health status.
       3. First check visual suitability: is there exactly one person, with face and hair sufficiently visible? If not, set isValid to false and provide a reason.
       4. If visually suitable, set isValid to true and provide the hair attributes.
-      5. If any attribute is obscured or uncertain, explicitly use "unknown".`,
+      5. For every attribute, provide both the 'value' and the 'source' of that conclusion. 
+         - 'Observed': Directly visible or detectable from the photo.
+         - 'Inferred': An AI conclusion derived from secondary visual evidence.
+         - 'User-provided': Explicitly provided by user/input (NEVER use this for visual observations from the image).
+         - 'Unknown': Cannot be reliably determined.
+      6. If any attribute is obscured or uncertain, explicitly use "unknown" for the value and "Unknown" for the source.`,
       messages: [
         {
           role: 'user',

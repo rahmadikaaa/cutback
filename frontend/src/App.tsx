@@ -68,12 +68,34 @@ export interface HairstyleItem {
   bestMatch: boolean
   bestMatchReason?: string
   constraints?: string[]
+  feasibility?: 'Ready Now' | 'Possible with Adjustment' | 'Transition Required' | 'Not Currently Realistic'
+  transitionGuidance?: string
+  barberBrief?: {
+    top?: string
+    sides?: string
+    back?: string
+    fringe?: string
+    styling?: string
+    maintenance?: string
+    preserve?: string
+    avoid?: string
+  }
   previewPortrait: string
   top: string
   sides: string
   back: string
   fade: string
   styling: string
+}
+
+function extractValue(attr: any): string {
+  if (!attr) return 'unknown'
+  return typeof attr === 'string' ? attr : attr.value
+}
+
+function extractSource(attr: any): string {
+  if (!attr) return 'Unknown'
+  return typeof attr === 'string' ? 'Unknown' : attr.source
 }
 
 function mapBackendRecommendations(
@@ -106,18 +128,18 @@ function mapBackendRecommendations(
       evidence.push({ obs: 'Best Match', contribution: rec.bestMatchReason })
     }
 
-    if (analysisData?.attributes?.faceShape && analysisData.attributes.faceShape !== 'unknown') {
-      const face = analysisData.attributes.faceShape
+    const faceVal = extractValue(analysisData?.attributes?.faceShape)
+    if (faceVal !== 'unknown') {
       evidence.push({
-        obs: `${face.charAt(0).toUpperCase() + face.slice(1)} face`,
+        obs: `${faceVal.charAt(0).toUpperCase() + faceVal.slice(1)} face`,
         contribution: 'proportions naturally framed by this cut',
       })
     }
 
-    if (analysisData?.attributes?.hairType && analysisData.attributes.hairType !== 'unknown') {
-      const hair = analysisData.attributes.hairType
+    const hairVal = extractValue(analysisData?.attributes?.hairType)
+    if (hairVal !== 'unknown') {
       evidence.push({
-        obs: `${hair.charAt(0).toUpperCase() + hair.slice(1)} pattern`,
+        obs: `${hairVal.charAt(0).toUpperCase() + hairVal.slice(1)} pattern`,
         contribution: 'works with natural movement',
       })
     }
@@ -139,6 +161,9 @@ function mapBackendRecommendations(
       bestMatch: rec.isBestMatch,
       bestMatchReason: rec.bestMatchReason,
       constraints: rec.constraints,
+      feasibility: rec.feasibility,
+      transitionGuidance: rec.transitionGuidance,
+      barberBrief: rec.barberBrief,
       previewPortrait: portraits[index % portraits.length],
       top: 'Customised length and texture for your hair',
       sides: 'Clean tapered finish to balance proportion',
@@ -223,12 +248,12 @@ const ANALYSIS_STEPS = [
 ]
 
 const ANALYSIS_OBS = [
-  { label: 'Face shape', value: 'Oval', status: 'observed' },
-  { label: 'Hair pattern', value: 'Natural wave', status: 'observed' },
-  { label: 'Current length', value: 'Short-medium', status: 'observed' },
-  { label: 'Volume', value: 'Moderate', status: 'observed' },
-  { label: 'Hair thickness', value: 'Unknown', status: 'unknown' },
-  { label: 'Texture', value: 'Fine-medium', status: 'observed' },
+  { label: 'Face shape', value: 'Oval', source: 'Observed' },
+  { label: 'Hair pattern', value: 'Natural wave', source: 'Observed' },
+  { label: 'Current length', value: 'Short-medium', source: 'Observed' },
+  { label: 'Volume', value: 'Moderate', source: 'Observed' },
+  { label: 'Hair thickness', value: 'Unknown', source: 'Unknown' },
+  { label: 'Texture', value: 'Fine-medium', source: 'Observed' },
 ]
 
 const VIBES = ['Fresh', 'Classic', 'Bold', 'Natural', 'Low-key']
@@ -985,33 +1010,33 @@ function AnalysisResultsScreen({
     ? [
       {
         label: 'Face shape',
-        value: formatAttrValue(analysisData.attributes.faceShape),
-        status: analysisData.attributes.faceShape === 'unknown' ? 'unknown' : 'observed',
+        value: formatAttrValue(extractValue(analysisData.attributes.faceShape)),
+        source: extractSource(analysisData.attributes.faceShape),
       },
       {
         label: 'Hair pattern',
-        value: formatAttrValue(analysisData.attributes.hairType),
-        status: analysisData.attributes.hairType === 'unknown' ? 'unknown' : 'observed',
+        value: formatAttrValue(extractValue(analysisData.attributes.hairType)),
+        source: extractSource(analysisData.attributes.hairType),
       },
       {
         label: 'Current length',
-        value: formatAttrValue(analysisData.attributes.hairLength),
-        status: analysisData.attributes.hairLength === 'unknown' ? 'unknown' : 'observed',
+        value: formatAttrValue(extractValue(analysisData.attributes.hairLength)),
+        source: extractSource(analysisData.attributes.hairLength),
       },
       {
         label: 'Hairline',
-        value: formatAttrValue(analysisData.attributes.hairLine),
-        status: analysisData.attributes.hairLine === 'unknown' ? 'unknown' : 'observed',
+        value: formatAttrValue(extractValue(analysisData.attributes.hairLine)),
+        source: extractSource(analysisData.attributes.hairLine),
       },
       {
         label: 'Hair thickness',
-        value: formatAttrValue(analysisData.attributes.hairThickness),
-        status: analysisData.attributes.hairThickness === 'unknown' ? 'unknown' : 'observed',
+        value: formatAttrValue(extractValue(analysisData.attributes.hairThickness)),
+        source: extractSource(analysisData.attributes.hairThickness),
       },
       {
         label: 'Visual Suitability',
         value: analysisData.visualSuitability.isValid ? 'Verified' : 'Flagged',
-        status: analysisData.visualSuitability.isValid ? 'observed' : 'unknown',
+        source: analysisData.visualSuitability.isValid ? 'Observed' : 'Unknown',
       },
     ]
     : ANALYSIS_OBS
@@ -1034,14 +1059,21 @@ function AnalysisResultsScreen({
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-8">
         <div className="grid grid-cols-2 gap-2.5 mb-5">
           {displayObs.map((obs, i) => (
-            <div key={i} className="rounded-xl p-3.5" style={{ background: obs.status === 'unknown' ? 'rgba(138,130,120,0.08)' : 'var(--secondary)', border: '1px solid var(--border)' }}>
-              <p className="uppercase mb-1" style={{ color: obs.status === 'unknown' ? 'var(--muted-foreground)' : '#c9a96e', fontSize: 9, letterSpacing: '0.1em' }}>
-                {obs.label}
-              </p>
-              <p className="text-sm font-medium" style={{ color: obs.status === 'unknown' ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
+            <div key={i} className="rounded-xl p-3.5" style={{ background: obs.source === 'Unknown' ? 'rgba(138,130,120,0.08)' : 'var(--secondary)', border: '1px solid var(--border)' }}>
+              <div className="flex justify-between items-start mb-1">
+                <p className="uppercase" style={{ color: obs.source === 'Unknown' ? 'var(--muted-foreground)' : '#c9a96e', fontSize: 9, letterSpacing: '0.1em' }}>
+                  {obs.label}
+                </p>
+                {obs.source !== 'Unknown' && (
+                  <span className="px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-semibold" style={{ background: 'rgba(201,169,110,0.15)', color: '#c9a96e' }}>
+                    {obs.source}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-medium" style={{ color: obs.source === 'Unknown' ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
                 {obs.value}
               </p>
-              {obs.status === 'unknown' && (
+              {obs.source === 'Unknown' && (
                 <p style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Not observed</p>
               )}
             </div>
@@ -1408,6 +1440,16 @@ function RecommendationsScreen({
         </div>
 
         <ConvergeChain rec={rec} prefs={prefs} animKey={animKey} />
+
+        {rec.feasibility && (
+          <div key={`f-${animKey}`} className="rec-content rounded-xl p-4 mb-4" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
+            <p className="uppercase mb-1" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.1em' }}>Feasibility</p>
+            <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{rec.feasibility}</p>
+            {rec.transitionGuidance && (
+              <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--secondary-foreground)' }}>{rec.transitionGuidance}</p>
+            )}
+          </div>
+        )}
 
         {/* Effort + limitation row */}
         <div key={`i-${animKey}`} className="rec-content flex gap-2.5 mb-4">
@@ -1830,13 +1872,27 @@ function BarberBriefScreen({
   const [briefExpanded, setBriefExpanded] = useState(false)
   const UNKNOWNS = ['Exact fade height (confirm with barber)', 'Parting preference if applicable']
 
-  const rows = [
-    { label: 'Top', value: rec.top },
-    { label: 'Sides', value: rec.sides },
-    { label: 'Back', value: rec.back },
-    { label: 'Fade / Taper', value: rec.fade },
-    { label: 'Styling', value: rec.styling },
-  ]
+  let rows: { label: string; value: string }[] = []
+
+  if (rec.barberBrief) {
+    const brief = rec.barberBrief
+    if (brief.top) rows.push({ label: 'Top', value: brief.top })
+    if (brief.sides) rows.push({ label: 'Sides', value: brief.sides })
+    if (brief.back) rows.push({ label: 'Back', value: brief.back })
+    if (brief.fringe) rows.push({ label: 'Fringe', value: brief.fringe })
+    if (brief.styling) rows.push({ label: 'Styling', value: brief.styling })
+    if (brief.maintenance) rows.push({ label: 'Maintenance', value: brief.maintenance })
+    if (brief.preserve) rows.push({ label: 'Preserve', value: brief.preserve })
+    if (brief.avoid) rows.push({ label: 'Avoid', value: brief.avoid })
+  } else {
+    if (rec.top) rows.push({ label: 'Top', value: rec.top })
+    if (rec.sides) rows.push({ label: 'Sides', value: rec.sides })
+    if (rec.back) rows.push({ label: 'Back', value: rec.back })
+    if (rec.fade) rows.push({ label: 'Fade / Taper', value: rec.fade })
+    if (rec.styling) rows.push({ label: 'Styling', value: rec.styling })
+    if (rec.description) rows.push({ label: 'Description', value: rec.description })
+    if (rec.constraints && rec.constraints.length > 0) rows.push({ label: 'Constraints', value: rec.constraints.join('. ') })
+  }
 
   return (
     <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>

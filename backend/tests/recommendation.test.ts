@@ -1,6 +1,7 @@
 import request from 'supertest';
 import app from '../src/app';
 import { revisions } from '../src/state';
+import { RecommendationSchema } from '../src/recommendation';
 
 describe('Recommendation Endpoint (T4)', () => {
   beforeEach(() => {
@@ -70,6 +71,73 @@ describe('Recommendation Endpoint (T4)', () => {
       const state = revisions.get('test-recs');
       expect(state?.status).toBe('READY_FOR_PREVIEW');
       expect(state?.selectedHairstyleId).toBe('style1');
+    });
+  });
+
+  describe('RecommendationSchema Validation', () => {
+    it('should validate all 4 valid feasibility values', () => {
+      const validFeasibilities = ['Ready Now', 'Possible with Adjustment', 'Transition Required', 'Not Currently Realistic'] as const;
+      validFeasibilities.forEach(feasibility => {
+        const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, feasibility }] };
+        const result = RecommendationSchema.safeParse(data);
+        expect(result.success).toBe(true);
+      });
+    });
+
+    it('should reject invalid feasibility value', () => {
+      const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, feasibility: 'Impossible' }] };
+      const result = RecommendationSchema.safeParse(data);
+      expect(result.success).toBe(false);
+    });
+
+    it('should allow optional transitionGuidance', () => {
+      const data1 = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, feasibility: 'Transition Required', transitionGuidance: 'Wait 3 months' }] };
+      const data2 = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, feasibility: 'Transition Required' }] };
+      expect(RecommendationSchema.safeParse(data1).success).toBe(true);
+      expect(RecommendationSchema.safeParse(data2).success).toBe(true);
+    });
+
+    it('should allow missing feasibility for legacy compatibility', () => {
+      const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false }] };
+      const result = RecommendationSchema.safeParse(data);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.recommendations[0].feasibility).toBeUndefined();
+      }
+    });
+
+    it('should allow omitting barberBrief entirely for legacy compatibility', () => {
+      const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false }] };
+      expect(RecommendationSchema.safeParse(data).success).toBe(true);
+    });
+
+    it('should allow an empty barberBrief object', () => {
+      const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, barberBrief: {} }] };
+      expect(RecommendationSchema.safeParse(data).success).toBe(true);
+    });
+
+    it('should allow a partial barberBrief', () => {
+      const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, barberBrief: { top: 'Leave longer', avoid: 'cutting too short' } }] };
+      expect(RecommendationSchema.safeParse(data).success).toBe(true);
+    });
+
+    it('should allow all supported fields as strings in barberBrief', () => {
+      const data = { 
+        recommendations: [{ 
+          id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, 
+          barberBrief: { 
+            top: 'str', sides: 'str', back: 'str', fringe: 'str', 
+            styling: 'str', maintenance: 'str', preserve: 'str', avoid: 'str' 
+          } 
+        }] 
+      };
+      expect(RecommendationSchema.safeParse(data).success).toBe(true);
+    });
+
+    it('should reject invalid types in barberBrief fields', () => {
+      const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, barberBrief: { top: 123 } }] };
+      const result = RecommendationSchema.safeParse(data);
+      expect(result.success).toBe(false);
     });
   });
 });
