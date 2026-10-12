@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../src/app';
 import { revisions } from '../src/state';
-import { RecommendationSchema } from '../src/recommendation';
+import { RecommendationSchema, resolveBestMatch } from '../src/recommendation';
 
 describe('Recommendation Endpoint (T4)', () => {
   beforeEach(() => {
@@ -138,6 +138,77 @@ describe('Recommendation Endpoint (T4)', () => {
       const data = { recommendations: [{ id: '1', name: 'A', description: 'B', reason: 'C', stylingEffort: 'low', constraints: [], isBestMatch: false, barberBrief: { top: 123 } }] };
       const result = RecommendationSchema.safeParse(data);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('resolveBestMatch Logic (REC-03)', () => {
+    it('should keep exactly one Best Match when AI output is already valid and realistic', () => {
+      const recs: any[] = [
+        { id: '1', name: 'Buzz', feasibility: 'Ready Now', isBestMatch: true, bestMatchReason: 'Suits your shape' },
+        { id: '2', name: 'Crew', feasibility: 'Possible with Adjustment', isBestMatch: false }
+      ];
+      resolveBestMatch(recs);
+      expect(recs.filter(r => r.isBestMatch).length).toBe(1);
+      expect(recs[0].isBestMatch).toBe(true);
+      expect(recs[0].bestMatchReason).toBe('Suits your shape');
+    });
+
+    it('should demote an unrealistic Best Match if a realistic alternative is available', () => {
+      const recs: any[] = [
+        { id: '1', name: 'Long Flow', feasibility: 'Not Currently Realistic', isBestMatch: true, bestMatchReason: 'Looks cool' },
+        { id: '2', name: 'Crew Cut', feasibility: 'Ready Now', isBestMatch: false }
+      ];
+      resolveBestMatch(recs);
+      expect(recs.filter(r => r.isBestMatch).length).toBe(1);
+      expect(recs[1].isBestMatch).toBe(true);
+      expect(recs[1].name).toBe('Crew Cut');
+      expect(recs[0].isBestMatch).toBe(false);
+    });
+
+    it('should resolve deterministically to the most realistic option when 0 Best Matches exist', () => {
+      const recs: any[] = [
+        { id: '1', name: 'Transition Style', feasibility: 'Transition Required', isBestMatch: false },
+        { id: '2', name: 'Adjusted Style', feasibility: 'Possible with Adjustment', isBestMatch: false },
+        { id: '3', name: 'Ready Style', feasibility: 'Ready Now', isBestMatch: false }
+      ];
+      resolveBestMatch(recs);
+      expect(recs.filter(r => r.isBestMatch).length).toBe(1);
+      expect(recs[2].isBestMatch).toBe(true);
+      expect(recs[2].name).toBe('Ready Style');
+      expect(recs[2].bestMatchReason).toContain('Ready Now');
+    });
+
+    it('should resolve deterministically when multiple Best Matches are returned by AI', () => {
+      const recs: any[] = [
+        { id: '1', name: 'Style A', feasibility: 'Possible with Adjustment', isBestMatch: true },
+        { id: '2', name: 'Style B', feasibility: 'Ready Now', isBestMatch: true }
+      ];
+      resolveBestMatch(recs);
+      expect(recs.filter(r => r.isBestMatch).length).toBe(1);
+      expect(recs[1].isBestMatch).toBe(true);
+      expect(recs[1].name).toBe('Style B');
+    });
+
+    it('should handle all options requiring transition gracefully when none are Ready Now', () => {
+      const recs: any[] = [
+        { id: '1', name: 'Grow Out A', feasibility: 'Transition Required', isBestMatch: false },
+        { id: '2', name: 'Grow Out B', feasibility: 'Not Currently Realistic', isBestMatch: false }
+      ];
+      resolveBestMatch(recs);
+      expect(recs.filter(r => r.isBestMatch).length).toBe(1);
+      expect(recs[0].isBestMatch).toBe(true);
+      expect(recs[0].feasibility).toBe('Transition Required');
+    });
+
+    it('should handle missing or invalid feasibility without throwing errors', () => {
+      const recs: any[] = [
+        { id: '1', name: 'Legacy Style A', isBestMatch: false },
+        { id: '2', name: 'Legacy Style B', isBestMatch: false }
+      ];
+      resolveBestMatch(recs);
+      expect(recs.filter(r => r.isBestMatch).length).toBe(1);
+      expect(recs[0].isBestMatch).toBe(true);
+      expect(recs[0].bestMatchReason).toBeDefined();
     });
   });
 });

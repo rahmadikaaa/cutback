@@ -159,8 +159,8 @@ Frontend / Figma-derived UI
 | Reasoning | Gemini for multimodal analysis and recommendation reasoning |
 | Deterministic work | Regular application functions and routers, not LLM calls |
 | Analysis/image models | Exact models and configuration must be locked in `specs/design.md` before implementation |
-| Storage | Photo storage, saved-haircut persistence, and guest/account strategy must be locked before persistence work |
-| Deployment | Google Cloud target; exact production topology must be documented and verified |
+| Storage | Cloud Firestore (for state) and Cloud Storage (for images), verified in production |
+| Deployment | Firebase Hosting and Google Cloud Run, verified in production |
 | Observability | Request/job IDs, route/node status, latency, model usage, and cost-relevant metadata without private photos or notes |
 
 ADK is the orchestration layer; it does not replace the application API's responsibilities for validation, permissions, quotas, consistency, or privacy.

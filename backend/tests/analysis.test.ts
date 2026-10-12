@@ -26,12 +26,59 @@ describe('Analysis Endpoint (T3)', () => {
     expect(response.body.route).toBe('STALE');
   });
 
-  it('should return REUPLOAD if imageBase64 is missing', async () => {
-    revisions.set('test-ready-id', { id: 'test-ready-id', status: 'READY' });
-    const response = await request(app).post('/api/analyze').send({ revisionId: 'test-ready-id' });
+  it('should return existing analysis if status is already ANALYZED (idempotency)', async () => {
+    const mockAnalysis = {
+      visualSuitability: { isValid: true },
+      attributes: {
+        hairLength: { value: 'short', source: 'Observed' },
+        hairType: { value: 'straight', source: 'Observed' },
+        hairThickness: { value: 'thick', source: 'Observed' },
+        hairLine: { value: 'straight', source: 'Observed' },
+        faceShape: { value: 'oval', source: 'Inferred' }
+      }
+    };
+    revisions.set('test-analyzed-id', {
+      id: 'test-analyzed-id',
+      status: 'ANALYZED',
+      imageBase64: 'data:image/jpeg;base64,123',
+      analysis: mockAnalysis
+    });
+
+    const response = await request(app).post('/api/analyze').send({ revisionId: 'test-analyzed-id' });
     expect(response.status).toBe(200);
-    expect(response.body.route).toBe('REUPLOAD');
-    expect(response.body.message).toContain('Photo data is missing');
+    expect(response.body.route).toBe('SUCCESS');
+    expect(response.body.message).toContain('already completed');
+    expect(response.body.analysis).toEqual(mockAnalysis);
+  });
+
+  it('should wait for and return the in-flight analysisPromise for concurrent requests', async () => {
+    let resolvePromise: any;
+    const mockResult = {
+      route: 'SUCCESS',
+      analysis: { visualSuitability: { isValid: true } },
+      message: 'Concurrent analysis complete.'
+    };
+    const inFlightPromise = new Promise(resolve => {
+      resolvePromise = resolve;
+    });
+
+    revisions.set('test-concurrent-id', {
+      id: 'test-concurrent-id',
+      status: 'READY',
+      imageBase64: 'data:image/jpeg;base64,123',
+      analysisPromise: inFlightPromise
+    });
+
+    // Send request while promise is pending
+    const reqPromise = request(app).post('/api/analyze').send({ revisionId: 'test-concurrent-id' });
+
+    // Resolve in-flight promise
+    resolvePromise(mockResult);
+
+    const response = await reqPromise;
+    expect(response.status).toBe(200);
+    expect(response.body.route).toBe('SUCCESS');
+    expect(response.body.message).toBe('Concurrent analysis complete.');
   });
 });
 

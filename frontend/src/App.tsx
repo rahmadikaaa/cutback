@@ -48,6 +48,8 @@ interface SavedHaircut {
   name: string
   date: string
   hairstyleId: number
+  backendId?: string
+  hairstyleName?: string
   previewImageUrl?: string
   rec?: HairstyleItem
   originalPhotoUrl?: string
@@ -241,10 +243,10 @@ const HAIRSTYLES: HairstyleItem[] = [
 ]
 
 const ANALYSIS_STEPS = [
-  'Preparing photo…',
-  'Analysing visible features…',
-  'Reading hair characteristics…',
-  'Building grounded recommendations…',
+  'Preparing your photo',
+  'Reading visible features',
+  'Understanding your hair',
+  'Building your recommendations',
 ]
 
 const ANALYSIS_OBS = [
@@ -861,6 +863,11 @@ function AnalysisLoadingScreen({
 }) {
   const [step, setStep] = useState(0)
   const isMountedRef = useRef(true)
+  const executedRevisionRef = useRef<string | null>(null)
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
+  const onFailRef = useRef(onFail)
+  onFailRef.current = onFail
 
   useEffect(() => {
     isMountedRef.current = true
@@ -876,9 +883,15 @@ function AnalysisLoadingScreen({
 
     async function executeAnalysis() {
       if (!revisionId) {
-        onFail('No photo revision found. Please upload a photo first.')
+        onFailRef.current('No photo revision found. Please upload a photo first.')
         return
       }
+
+      // Deduplication guard for React StrictMode double-mounting (DEF-001)
+      if (executedRevisionRef.current === revisionId) {
+        return
+      }
+      executedRevisionRef.current = revisionId
 
       try {
         const res = await analyzePhoto(revisionId)
@@ -886,60 +899,84 @@ function AnalysisLoadingScreen({
         if (!isMountedRef.current) return
 
         if (res.route === 'SUCCESS' && res.analysis) {
-          onComplete(res.analysis)
+          onCompleteRef.current(res.analysis)
         } else if (res.route === 'REUPLOAD') {
-          onFail(res.message || 'Photo was not suitable for analysis. Please upload a clearer photo.')
+          onFailRef.current(res.message || 'Photo was not suitable for analysis. Please upload a clearer photo.')
         } else if (res.route === 'RETRY_REQUIRED') {
-          onFail(res.message || 'Analysis temporarily failed. Please retry.')
+          onFailRef.current(res.message || 'Analysis temporarily failed. Please retry.')
         } else {
-          onFail(res.message || 'Analysis could not be completed.')
+          onFailRef.current(res.message || 'Analysis could not be completed.')
         }
       } catch (err: any) {
         if (!isMountedRef.current) return
-        onFail(err.message || 'Network error connecting to analysis service.')
+        onFailRef.current(err.message || 'Network error connecting to analysis service.')
       }
     }
 
     executeAnalysis()
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [revisionId])
 
   return (
     <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>
-      <div className="relative flex-shrink-0" style={{ height: '54vh' }}>
-        <img src={photo} alt="Your photo" className="w-full h-full object-cover object-top" />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(8,12,20,1) 100%)' }} />
-        <div className="absolute top-12 left-5">
-          <SimBadge label="AI Analysis" />
+      {/* Hero Photo Container */}
+      <div className="relative flex-shrink-0" style={{ height: '58vh', padding: '24px 20px 0 20px' }}>
+        <div className="relative w-full h-full rounded-[24px] overflow-hidden" style={{ border: '1px solid rgba(240,235,224,0.06)' }}>
+          <img src={photo} alt="Your photo" className="w-full h-full object-cover object-top" />
+          {/* Subtle gradient only at the very bottom */}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 80%, rgba(8,12,20,0.9) 100%)' }} />
+
+          {/* Integrated AI Badge */}
+          <div className="absolute top-5 left-5" style={{ backdropFilter: 'blur(8px)' }}>
+            <SimBadge label="AI Analysis" />
+          </div>
         </div>
       </div>
-      <div className="px-5 pt-6 pb-8 flex flex-col gap-4">
-        <div className="space-y-3">
-          {ANALYSIS_STEPS.map((s, i) => (
-            <div key={i} className="flex items-center gap-3 transition-all duration-300" style={{ opacity: i <= step ? 1 : 0.22 }}>
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: i < step ? '#c9a96e' : i === step ? 'rgba(201,169,110,0.15)' : 'var(--secondary)',
-                  border: i === step ? '2px solid rgba(201,169,110,0.7)' : 'none',
-                  transition: 'all 300ms',
-                }}
-              >
-                {i < step ? (
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5L4.5 7.5L8 3" stroke="#080c14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : i === step ? (
-                  <div className="w-2 h-2 rounded-full" style={{ background: '#c9a96e', animation: 'dotPulse 1s ease-in-out infinite' }} />
-                ) : null}
+
+      {/* Analysis Timeline */}
+      <div className="flex-1 px-7 pt-10 pb-8 flex flex-col">
+        <div className="space-y-4 flex-1">
+          {ANALYSIS_STEPS.map((s, i) => {
+            const isCompleted = i < step
+            const isActive = i === step
+            const isPending = i > step
+
+            return (
+              <div key={i} className="flex items-center gap-4 transition-all duration-500" style={{ opacity: isPending ? 0.25 : 1 }}>
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                >
+                  {isCompleted ? (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6L4.5 8.5L10 3" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }} />
+                    </svg>
+                  ) : isActive ? (
+                    <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+                       <div className="absolute w-full h-full rounded-full" style={{ background: 'rgba(201,169,110,0.25)', animation: 'dotPulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                       <div className="absolute w-1.5 h-1.5 rounded-full" style={{ background: '#c9a96e' }} />
+                    </div>
+                  ) : (
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--muted-foreground)' }} />
+                  )}
+                </div>
+                <span className="text-[15px] transition-all duration-500" style={{
+                  color: isActive ? '#f0ebe0' : 'rgba(240,235,224,0.5)',
+                  fontWeight: isActive ? 500 : 400,
+                  transform: isActive ? 'translateX(2px)' : 'none',
+                  letterSpacing: '0.01em'
+                }}>{s}</span>
               </div>
-              <span className="text-sm" style={{ color: i <= step ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{s}</span>
-            </div>
-          ))}
+            )
+          })}
         </div>
-        <div className="flex gap-1.5 mt-2">
-          {[0, 1, 2].map(i => <div key={i} className="loading-dot w-2 h-2 rounded-full" style={{ background: '#c9a96e' }} />)}
+        {/* Contextual Line */}
+        <div className="text-center mt-auto pt-6">
+          <p className="text-xs" style={{ color: 'rgba(240,235,224,0.4)', letterSpacing: '0.02em' }}>
+            Finding styles that work with your hair, face, and preferences.
+          </p>
         </div>
       </div>
     </div>
@@ -1425,17 +1462,22 @@ function RecommendationsScreen({
 
           <button
             onClick={() => {
-              if (hasChosen) onSeePreview()
-              else setChosenRec(safeActiveRec)
+              if (hasChosen && chosenRec === safeActiveRec) {
+                // User has chosen the currently viewed recommendation and is ready for preview
+                onSeePreview()
+              } else {
+                // Explicitly set chosenRec to the currently viewed recommendation
+                setChosenRec(safeActiveRec)
+              }
             }}
             className="w-full py-3 rounded-lg font-medium text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-2"
             style={{
-              background: hasChosen ? '#c9a96e' : 'rgba(201,169,110,0.12)',
-              color: hasChosen ? '#080c14' : '#c9a96e',
-              border: hasChosen ? 'none' : '1px solid rgba(201,169,110,0.3)'
+              background: (hasChosen && chosenRec === safeActiveRec) ? '#c9a96e' : 'rgba(201,169,110,0.12)',
+              color: (hasChosen && chosenRec === safeActiveRec) ? '#080c14' : '#c9a96e',
+              border: (hasChosen && chosenRec === safeActiveRec) ? 'none' : '1px solid rgba(201,169,110,0.3)'
             }}
           >
-            Continue Journey <span className="text-[10px]">→</span>
+            {(hasChosen && chosenRec === safeActiveRec) ? 'Continue to Preview' : 'Select This Cut for Journey'} <span className="text-[10px]">→</span>
           </button>
         </div>
 
@@ -1552,13 +1594,21 @@ function PreviewLoadingScreen({
     'Finalising your preview…',
   ]
 
+  const isMountedRef = useRef(true)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
   const onFailRef = useRef(onFail)
   onFailRef.current = onFail
+  const executedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
     const stepInterval = setInterval(() => {
       setStep(prev => (prev < steps.length - 1 ? prev + 1 : prev))
     }, 1400)
@@ -1571,14 +1621,21 @@ function PreviewLoadingScreen({
         }
 
         const hairstyleId = selectedHairstyle.backendId || String(selectedHairstyle.id)
+        const execKey = `${revisionId}:${hairstyleId}`
+
+        // StrictMode remount deduplication (DEF-001)
+        if (executedKeyRef.current === execKey) {
+          return
+        }
+        executedKeyRef.current = execKey
 
         // 1. Select hairstyle on backend to set state to READY_FOR_PREVIEW
         await selectHairstyle(revisionId, hairstyleId)
-        if (cancelled) return
+        if (!isMountedRef.current) return
 
         // 2. Generate preview via AI backend
         const res = await generatePreview(revisionId, hairstyleId)
-        if (cancelled) return
+        if (!isMountedRef.current) return
 
         if (res.route === 'SUCCESS' && res.previewImageUrl) {
           onCompleteRef.current(res.previewImageUrl)
@@ -1586,7 +1643,7 @@ function PreviewLoadingScreen({
           onFailRef.current(res.message || 'AI preview generation failed.')
         }
       } catch (err: any) {
-        if (cancelled) return
+        if (!isMountedRef.current) return
         onFailRef.current(err.message || 'Failed to connect to preview service.')
       }
     }
@@ -1594,7 +1651,6 @@ function PreviewLoadingScreen({
     runGeneration()
 
     return () => {
-      cancelled = true
       clearInterval(stepInterval)
     }
   }, [revisionId, selectedHairstyle.backendId, selectedHairstyle.id])
@@ -1870,6 +1926,7 @@ function BarberBriefScreen({
 }) {
   const rec = selectedHairstyle
   const [briefExpanded, setBriefExpanded] = useState(false)
+  const [showPresentationModal, setShowPresentationModal] = useState(false)
   const UNKNOWNS = ['Exact fade height (confirm with barber)', 'Parting preference if applicable']
 
   let rows: { label: string; value: string }[] = []
@@ -2024,12 +2081,116 @@ function BarberBriefScreen({
           <button
             className="w-full py-4 rounded-xl font-medium text-base transition-all active:scale-[0.98] mb-3"
             style={{ background: '#c9a96e', color: '#080c14', minHeight: 56, fontFamily: 'var(--font-sans)' }}
-            onClick={() => { }}
+            onClick={() => setShowPresentationModal(true)}
           >
             Show My Barber
           </button>
           <GhostBtn onClick={onSave}>Save This Haircut</GhostBtn>
         </div>
+
+        {/* Barber Presentation Mode Modal (DEF-003 Option A) */}
+        {showPresentationModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+            style={{ background: 'rgba(4, 6, 10, 0.88)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setShowPresentationModal(false)}
+          >
+            <div
+              className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl overflow-hidden border"
+              style={{ background: '#0a0f18', borderColor: 'rgba(201,169,110,0.3)', boxShadow: '0 25px 60px rgba(0,0,0,0.8)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'rgba(240,235,224,0.08)', background: '#0f1622' }}>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#c9a96e] animate-pulse" />
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-[#c9a96e] font-semibold">Barber Presentation Mode</span>
+                    <h3 className="font-display text-xl text-[#f0ebe0] leading-none mt-0.5">{rec.name}</h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPresentationModal(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#8e98a8] hover:text-[#f0ebe0] bg-[#141d2b] transition-colors"
+                  aria-label="Close Barber Mode"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {/* Visual reference side-by-side */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl overflow-hidden border border-[rgba(240,235,224,0.08)] bg-[#04060a]">
+                    <div className="aspect-[3/4] relative">
+                      <img src={photo} alt="Original reference" className="w-full h-full object-cover object-top" />
+                    </div>
+                    <div className="py-1 px-2.5 text-center bg-[#0d1420]">
+                      <span className="text-[11px] font-medium text-[#8e98a8]">Current (Before)</span>
+                    </div>
+                  </div>
+                  <div className="rounded-xl overflow-hidden border border-[rgba(201,169,110,0.25)] bg-[#04060a]">
+                    <div className="aspect-[3/4] relative">
+                      {previewAvail && previewImageUrl ? (
+                        <img src={previewImageUrl} alt="Target simulation" className="w-full h-full object-cover object-top" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xs text-[#8e98a8] p-2 text-center">Reference look</div>
+                      )}
+                    </div>
+                    <div className="py-1 px-2.5 text-center bg-[#151c28]">
+                      <span className="text-[11px] font-medium text-[#c9a96e]">Target (After)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Structured Cutting Specifications */}
+                <div className="rounded-xl p-3.5 border border-[rgba(240,235,224,0.08)] bg-[#0f1622]">
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-[#c9a96e] mb-2 font-semibold">Technical Cutting Specs</p>
+                  <div className="space-y-2">
+                    {rows.map(row => (
+                      <div key={row.label} className="flex gap-2 text-xs">
+                        <span className="w-24 flex-shrink-0 text-[#8e98a8] uppercase font-mono text-[10px] pt-0.5">{row.label}</span>
+                        <span className="text-[#f0ebe0] font-medium leading-relaxed">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Client Notes if any */}
+                {notes && notes.trim().length > 0 && (
+                  <div className="rounded-xl p-3.5 border border-[rgba(240,235,224,0.08)] bg-[#0f1622]">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#8e98a8] mb-1 font-semibold">Client Preference Notes</p>
+                    <p className="text-xs text-[#f0ebe0] leading-relaxed italic">"{notes}"</p>
+                  </div>
+                )}
+
+                {/* Points to confirm */}
+                <div className="rounded-xl p-3.5 border border-[rgba(201,169,110,0.2)] bg-[rgba(201,169,110,0.05)]">
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-[#c9a96e] mb-1.5 font-semibold">Confirm with Barber</p>
+                  <ul className="text-xs text-[#d1c8b8] space-y-1">
+                    {UNKNOWNS.map(u => (
+                      <li key={u} className="flex gap-1.5">
+                        <span className="text-[#c9a96e]">•</span>
+                        <span>{u}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-[rgba(240,235,224,0.08)] bg-[#0f1622]">
+                <button
+                  onClick={() => setShowPresentationModal(false)}
+                  className="w-full py-3 rounded-xl font-medium text-sm transition-all bg-[#c9a96e] text-[#080c14] active:scale-[0.98]"
+                >
+                  Done / Close Presentation Mode
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -2251,7 +2412,26 @@ function MyHaircutsScreen({
         ) : (
           <div className="space-y-3">
             {savedHaircuts.map(hc => {
-              const style = hc.rec ?? HAIRSTYLES.find(h => h.id === hc.hairstyleId) ?? HAIRSTYLES[0]
+              const style: HairstyleItem = hc.rec ??
+                (hc.hairstyleId !== undefined ? HAIRSTYLES.find(h => h.id === hc.hairstyleId) : undefined) ??
+                {
+                  id: hc.hairstyleId ?? 0,
+                  backendId: hc.backendId,
+                  name: hc.hairstyleName || hc.name || 'Saved Hairstyle',
+                  description: 'Saved hairstyle brief',
+                  reason: 'Saved custom recommendation',
+                  reasonEvidence: [],
+                  effort: 'Medium',
+                  effortDetail: 'Custom styling',
+                  limitation: 'Consult barber for specifics',
+                  bestMatch: false,
+                  previewPortrait: portrait1,
+                  top: 'Custom length',
+                  sides: 'Tapered sides',
+                  back: 'Tapered neckline',
+                  fade: 'Custom taper',
+                  styling: 'Style as desired',
+                }
               return (
                 <div
                   key={hc.id}
@@ -2521,6 +2701,8 @@ export default function App() {
         name: saveName.trim() || rec.name,
         date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
         hairstyleId: rec.id,
+        backendId: rec.backendId,
+        hairstyleName: rec.name,
         previewImageUrl: previewImageUrl || undefined,
         rec,
         originalPhotoUrl: selectedPhoto || undefined
@@ -2539,16 +2721,29 @@ export default function App() {
     const hc = savedHaircuts.find(h => h.id === id)
     if (!hc) return
     if (hc.originalPhotoUrl) setSelectedPhoto(hc.originalPhotoUrl)
-    setChosenRec(hc.hairstyleId)
     setPreviewImageUrl(hc.previewImageUrl || null)
     setPreviewAvail(!!hc.previewImageUrl)
 
     if (hc.rec) {
       setRecommendations(prev => {
-        const arr = [...prev]
-        arr[hc.hairstyleId] = hc.rec!
-        return arr
+        // If the item exists in current recommendations by backendId or name, find its index
+        const existingIdx = prev.findIndex(r => (hc.rec?.backendId && r.backendId === hc.rec?.backendId) || r.name === hc.rec?.name);
+        if (existingIdx !== -1) {
+          setChosenRec(existingIdx);
+          const arr = [...prev];
+          arr[existingIdx] = hc.rec!;
+          return arr;
+        } else {
+          // Put the saved rec at the saved hairstyleId or append it safely
+          const targetIdx = typeof hc.hairstyleId === 'number' && hc.hairstyleId >= 0 && hc.hairstyleId < 10 ? hc.hairstyleId : 0;
+          setChosenRec(targetIdx);
+          const arr = [...prev];
+          arr[targetIdx] = hc.rec!;
+          return arr;
+        }
       })
+    } else {
+      setChosenRec(hc.hairstyleId ?? 0);
     }
 
     setScreen('barber-brief')
@@ -2558,16 +2753,27 @@ export default function App() {
     const hc = savedHaircuts.find(h => h.id === id)
     if (!hc) return
     if (hc.originalPhotoUrl) setSelectedPhoto(hc.originalPhotoUrl)
-    setChosenRec(hc.hairstyleId)
     setPreviewImageUrl(hc.previewImageUrl || null)
     setPreviewAvail(!!hc.previewImageUrl)
 
     if (hc.rec) {
       setRecommendations(prev => {
-        const arr = [...prev]
-        arr[hc.hairstyleId] = hc.rec!
-        return arr
+        const existingIdx = prev.findIndex(r => (hc.rec?.backendId && r.backendId === hc.rec?.backendId) || r.name === hc.rec?.name);
+        if (existingIdx !== -1) {
+          setChosenRec(existingIdx);
+          const arr = [...prev];
+          arr[existingIdx] = hc.rec!;
+          return arr;
+        } else {
+          const targetIdx = typeof hc.hairstyleId === 'number' && hc.hairstyleId >= 0 && hc.hairstyleId < 10 ? hc.hairstyleId : 0;
+          setChosenRec(targetIdx);
+          const arr = [...prev];
+          arr[targetIdx] = hc.rec!;
+          return arr;
+        }
       })
+    } else {
+      setChosenRec(hc.hairstyleId ?? 0);
     }
 
     setBriefNotes('')
@@ -2744,6 +2950,7 @@ export default function App() {
             setPreviewImageUrl(url)
             setPreviewAvail(true)
             setPreviewError(null)
+            setPreviewMode('possible')
             setScreen('preview')
           }}
           onFail={(errorMsg) => {

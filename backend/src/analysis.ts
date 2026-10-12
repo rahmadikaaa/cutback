@@ -43,7 +43,17 @@ export const analysisFlow = ai.defineFlow({
   if (!state) {
     return { route: 'STALE' as const, message: 'Revision not found or stale.' };
   }
-  
+
+  // Concurrency & duplicate request check (DEF-001)
+  if (state.analysisPromise) {
+    return await state.analysisPromise;
+  }
+
+  // Idempotency: return existing analysis without re-calling AI model
+  if (state.status === 'ANALYZED' && state.analysis) {
+    return { route: 'SUCCESS' as const, analysis: state.analysis, message: 'Analysis already completed.' };
+  }
+
   if (state.status !== 'READY' && state.status !== 'FAILED') {
     return { route: 'STALE' as const, message: `Cannot analyze photo in state: ${state.status}` };
   }
@@ -52,11 +62,11 @@ export const analysisFlow = ai.defineFlow({
     return { route: 'REUPLOAD' as const, message: 'Photo data is missing.' };
   }
 
-  // T3.12: Reasoning node
-  try {
-    const { output } = await ai.generate({
-      model: 'googleai/gemini-3.5-flash',
-      prompt: `Analyze this photo for hairstyle recommendations.
+  state.analysisPromise = (async () => {
+    try {
+      const { output } = await ai.generate({
+        model: 'googleai/gemini-3.5-flash',
+        prompt: `Analyze this photo for hairstyle recommendations.
       
       CRITICAL INSTRUCTIONS:
       1. Strictly adhere to the requested JSON schema.
@@ -69,51 +79,53 @@ export const analysisFlow = ai.defineFlow({
          - 'User-provided': Explicitly provided by user/input (NEVER use this for visual observations from the image).
          - 'Unknown': Cannot be reliably determined.
       6. If any attribute is obscured or uncertain, explicitly use "unknown" for the value and "Unknown" for the source.`,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { media: { url: state.imageBase64 } },
-            { text: 'Analyze this photo according to the instructions.' }
-          ]
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { media: { url: state.imageBase64! } },
+              { text: 'Analyze this photo according to the instructions.' }
+            ]
+          }
+        ],
+        output: {
+          schema: AnalysisSchema
         }
-      ],
-      output: {
-        schema: AnalysisSchema
-      }
-    });
+      });
 
-    // T3.13: Deterministic schema validation immediately after reasoning node
-    // Genkit's `generate` with output schema already validates and throws if it fails.
-    // We get typed output here.
-    const analysis = output;
+      // T3.13: Deterministic schema validation immediately after reasoning node
+      const analysis = output;
 
-    if (!analysis) {
+      if (!analysis) {
         throw new Error('Model returned empty output');
-    }
+      }
 
-    if (!analysis.visualSuitability.isValid) {
-      state.status = 'FAILED';
-      state.error = analysis.visualSuitability.reason || 'Visually inadequate photo.';
+      if (!analysis.visualSuitability.isValid) {
+        state.status = 'FAILED';
+        state.error = analysis.visualSuitability.reason || 'Visually inadequate photo.';
+        await saveRevision(input.revisionId, state);
+        return { route: 'REUPLOAD' as const, message: state.error || 'Visually inadequate photo.' };
+      }
+
+      // T3.7: Bind result to photo/revision ID
+      state.status = 'ANALYZED';
+      state.analysis = analysis;
       await saveRevision(input.revisionId, state);
-      return { route: 'REUPLOAD' as const, message: state.error || 'Visually inadequate photo.' };
+
+      return { route: 'SUCCESS' as const, analysis, message: 'Analysis complete.' };
+    } catch (err: any) {
+      console.error('Analysis error:', err);
+      // T3.6: Reject invalid AI output with clear retry state
+      state.status = 'FAILED';
+      state.error = err.message || 'Analysis failed or schema validation failed.';
+      await saveRevision(input.revisionId, state);
+      return { route: 'RETRY_REQUIRED' as const, message: state.error || 'Analysis failed' };
+    } finally {
+      state.analysisPromise = undefined;
     }
+  })();
 
-    // T3.7: Bind result to photo/revision ID
-    state.status = 'ANALYZED';
-    state.analysis = analysis;
-    await saveRevision(input.revisionId, state);
-
-    return { route: 'SUCCESS' as const, analysis, message: 'Analysis complete.' };
-  } catch (err: any) {
-    console.error('Analysis error:', err);
-    // T3.6: Reject invalid AI output with clear retry state
-    // T3.14: Route schema failure/retry through deterministic state
-    state.status = 'FAILED';
-    state.error = err.message || 'Analysis failed or schema validation failed.';
-    await saveRevision(input.revisionId, state);
-    return { route: 'RETRY_REQUIRED' as const, message: state.error || 'Analysis failed' };
-  }
+  return await state.analysisPromise;
 });
 
 export const analysisHandler = async (req: Request, res: Response) => {

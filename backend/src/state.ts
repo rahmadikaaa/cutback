@@ -17,6 +17,7 @@ export interface RevisionState {
   previewImageUrl?: string;
   previewImagePath?: string;
   previewPromise?: Promise<any>;
+  analysisPromise?: Promise<any>;
   error?: string;
 }
 
