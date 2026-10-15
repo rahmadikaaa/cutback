@@ -1,0 +1,29 @@
+{
+  "name": "cutback",
+  "version": "1.0.0",
+  "description": "**Your best haircut, remembered.**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rahmadikaaa/cutback.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rahmadikaaa/cutback/issues"
+  },
+  "homepage": "https://github.com/rahmadikaaa/cutback#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.5"
+  }
+}

@@ -3,8 +3,17 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { revisions } from './state';
-import { saveRevision } from './firestoreDb';
+import { saveRevision, getOrHydrateRevision } from './firestoreDb';
 import crypto from 'crypto';
+
+export const EvidenceSourceSchema = z.enum(['Observed', 'Inferred', 'User-provided', 'Unknown']);
+
+export const ReasonEvidenceItemSchema = z.object({
+  attribute: z.string(),
+  value: z.string(),
+  source: EvidenceSourceSchema,
+  contribution: z.string()
+});
 
 export const RecommendationSchema = z.object({
   recommendations: z.array(z.object({
@@ -12,6 +21,7 @@ export const RecommendationSchema = z.object({
     name: z.string(),
     description: z.string(),
     reason: z.string(),
+    reasonEvidence: z.array(ReasonEvidenceItemSchema).optional(),
     stylingEffort: z.enum(['low', 'medium', 'high']),
     constraints: z.array(z.string()),
     isBestMatch: z.boolean(),
@@ -35,6 +45,224 @@ export const RecommendationSchema = z.object({
     }).optional()
   })).max(3)
 });
+
+export function cleanCanonicalHaircutName(name: string, userNote?: string): string {
+  if (!name) return name;
+  let cleaned = name.trim();
+
+  // 1. Remove user note in parentheses or with hyphen/colon if matching userNote
+  if (userNote && userNote.trim()) {
+    const rawNote = userNote.trim();
+    const escaped = rawNote.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    cleaned = cleaned.replace(new RegExp(`\\s*(?:[(-/:]\\s*)*\\b${escaped}\\b\\s*[)]?`, 'gi'), '').trim();
+  }
+
+  // 2. Remove common informal aliases/notes in parentheses such as (Cepak), (buzz cut), (pendek), etc.
+  cleaned = cleaned.replace(/\s*\((?:cepak|buzz\s*cut|pendek|rapirapi|spiky|undercut|fade|taper|side\s*part|quiff)\)/gi, '').trim();
+
+  // 3. Remove trailing dangling punctuation or parens
+  cleaned = cleaned.replace(/[\s\-_:/(]+$/, '').trim();
+
+  return cleaned || name.trim();
+}
+
+export function validateAndAlignEvidence(
+  recommendations: Array<{
+    id: string;
+    name: string;
+    description: string;
+    reason: string;
+    reasonEvidence?: Array<{
+      attribute: string;
+      value: string;
+      source: 'Observed' | 'Inferred' | 'User-provided' | 'Unknown';
+      contribution: string;
+    }>;
+    stylingEffort: 'low' | 'medium' | 'high';
+    constraints: string[];
+    isBestMatch: boolean;
+    bestMatchReason?: string;
+    feasibility?: 'Ready Now' | 'Possible with Adjustment' | 'Transition Required' | 'Not Currently Realistic';
+    transitionGuidance?: string;
+    barberBrief?: any;
+  }>,
+  analysis?: any,
+  preferences?: any
+): void {
+  if (!recommendations || recommendations.length === 0) return;
+
+  const analysisAttrs = analysis?.attributes || {};
+
+  const getAnalysisAttr = (key: string) => {
+    const raw = analysisAttrs[key];
+    if (!raw) return { value: 'unknown', source: 'Unknown' as const };
+    const val = typeof raw === 'string' ? raw : (raw.value || 'unknown');
+    const src = (typeof raw === 'object' && raw.source) ? raw.source : 'Unknown';
+    return { value: val.toLowerCase(), source: src as 'Observed' | 'Inferred' | 'User-provided' | 'Unknown' };
+  };
+
+  const faceShape = getAnalysisAttr('faceShape');
+  const hairType = getAnalysisAttr('hairType');
+  const hairLength = getAnalysisAttr('hairLength');
+  const hairThickness = getAnalysisAttr('hairThickness');
+  const hairLine = getAnalysisAttr('hairLine');
+
+  for (const rec of recommendations) {
+    // 1. Sanitize canonical haircut name: strip user notes/slang like "(Cepak)"
+    rec.name = cleanCanonicalHaircutName(rec.name, preferences?.note);
+
+    // 2. Ground and align reasonEvidence
+    const rawEvidence = Array.isArray(rec.reasonEvidence) ? rec.reasonEvidence : [];
+    const alignedEvidence: Array<{
+      attribute: string;
+      value: string;
+      source: 'Observed' | 'Inferred' | 'User-provided' | 'Unknown';
+      contribution: string;
+    }> = [];
+
+    const seenAttributes = new Set<string>();
+
+    for (const item of rawEvidence) {
+      if (!item || !item.attribute) continue;
+      const attrLower = item.attribute.toLowerCase();
+      let matchedSource: 'Observed' | 'Inferred' | 'User-provided' | 'Unknown' = item.source || 'Unknown';
+      let normalizedAttr = item.attribute;
+      let normalizedVal = item.value;
+      let contribution = item.contribution || '';
+
+      if (attrLower.includes('face') || attrLower.includes('shape')) {
+        normalizedAttr = 'Face Shape';
+        matchedSource = faceShape.source;
+        if (faceShape.value !== 'unknown') {
+          normalizedVal = faceShape.value.charAt(0).toUpperCase() + faceShape.value.slice(1);
+        }
+        if (matchedSource === 'Inferred' && !contribution.toLowerCase().includes('likely') && !contribution.toLowerCase().includes('appears')) {
+          contribution = `Likely ${normalizedVal.toLowerCase()} face shape framed by this cut`;
+        }
+      } else if (attrLower.includes('pattern') || attrLower.includes('type') || attrLower.includes('wave') || attrLower.includes('straight') || attrLower.includes('curl')) {
+        normalizedAttr = 'Hair Pattern';
+        matchedSource = hairType.source;
+        if (hairType.value !== 'unknown') {
+          normalizedVal = hairType.value.charAt(0).toUpperCase() + hairType.value.slice(1);
+        }
+      } else if (attrLower.includes('length')) {
+        normalizedAttr = 'Hair Length';
+        matchedSource = hairLength.source;
+        if (hairLength.value !== 'unknown') {
+          normalizedVal = hairLength.value.charAt(0).toUpperCase() + hairLength.value.slice(1);
+        }
+      } else if (attrLower.includes('thickness') || attrLower.includes('density')) {
+        normalizedAttr = 'Hair Thickness';
+        matchedSource = hairThickness.source;
+        if (hairThickness.value === 'unknown') {
+          matchedSource = 'Unknown';
+          normalizedVal = 'Unknown';
+          contribution = 'Hair density not clearly determined from photo — confirm with barber';
+        } else {
+          normalizedVal = hairThickness.value.charAt(0).toUpperCase() + hairThickness.value.slice(1);
+          if (matchedSource === 'Inferred' && !contribution.toLowerCase().includes('likely') && !contribution.toLowerCase().includes('appears')) {
+            contribution = `Appears to have ${normalizedVal.toLowerCase()} hair density`;
+          }
+        }
+      } else if (attrLower.includes('hairline') || attrLower.includes('line')) {
+        normalizedAttr = 'Hairline';
+        matchedSource = hairLine.source;
+        if (hairLine.value !== 'unknown') {
+          normalizedVal = hairLine.value.charAt(0).toUpperCase() + hairLine.value.slice(1);
+        }
+      } else if (attrLower.includes('note') || attrLower.includes('preference') || attrLower.includes('user') || (preferences?.note && item.value?.toLowerCase().includes(preferences.note.toLowerCase()))) {
+        normalizedAttr = 'User Preference';
+        matchedSource = 'User-provided';
+        if (preferences?.note) {
+          normalizedVal = preferences.note;
+        }
+        contribution = contribution || `User requested "${normalizedVal}" styling preference`;
+      }
+
+      // Check for unsupported model claims on unknown attributes
+      if (normalizedAttr === 'Hair Thickness' && hairThickness.value === 'unknown') {
+        matchedSource = 'Unknown';
+        normalizedVal = 'Unknown';
+        contribution = 'Hair density not clearly determined from photo — confirm with barber';
+      }
+
+      if (!seenAttributes.has(normalizedAttr)) {
+        seenAttributes.add(normalizedAttr);
+        alignedEvidence.push({
+          attribute: normalizedAttr,
+          value: normalizedVal,
+          source: matchedSource,
+          contribution: contribution.trim()
+        });
+      }
+    }
+
+    // Baseline grounded evidence if empty
+    if (alignedEvidence.length === 0) {
+      if (faceShape.value !== 'unknown') {
+        const valCap = faceShape.value.charAt(0).toUpperCase() + faceShape.value.slice(1);
+        alignedEvidence.push({
+          attribute: 'Face Shape',
+          value: valCap,
+          source: faceShape.source,
+          contribution: faceShape.source === 'Inferred'
+            ? `Likely ${faceShape.value} proportions naturally framed by this cut`
+            : `${valCap} proportions naturally framed by this cut`
+        });
+        seenAttributes.add('Face Shape');
+      }
+
+      if (hairType.value !== 'unknown') {
+        const valCap = hairType.value.charAt(0).toUpperCase() + hairType.value.slice(1);
+        alignedEvidence.push({
+          attribute: 'Hair Pattern',
+          value: valCap,
+          source: hairType.source,
+          contribution: hairType.source === 'Inferred'
+            ? `Appears to work with natural ${hairType.value} movement`
+            : `Works with natural ${hairType.value} movement`
+        });
+        seenAttributes.add('Hair Pattern');
+      }
+
+      if (hairLength.value !== 'unknown') {
+        const valCap = hairLength.value.charAt(0).toUpperCase() + hairLength.value.slice(1);
+        alignedEvidence.push({
+          attribute: 'Hair Length',
+          value: valCap,
+          source: hairLength.source,
+          contribution: `Current ${hairLength.value} length provides viable base for this style`
+        });
+        seenAttributes.add('Hair Length');
+      }
+    }
+
+    // Include User Preference if provided in input
+    if (preferences?.note && preferences.note.trim() && !seenAttributes.has('User Preference')) {
+      alignedEvidence.push({
+        attribute: 'User Preference',
+        value: preferences.note.trim(),
+        source: 'User-provided',
+        contribution: `Personal preference for "${preferences.note.trim()}" influences style direction without altering photo findings`
+      });
+      seenAttributes.add('User Preference');
+    }
+
+    rec.reasonEvidence = alignedEvidence;
+
+    // 3. Ensure barberBrief does not contradict analysis
+    if (rec.barberBrief) {
+      if (hairThickness.value === 'unknown') {
+        if (rec.barberBrief.styling && rec.barberBrief.styling.toLowerCase().includes('thick hair')) {
+          rec.barberBrief.styling = rec.barberBrief.styling.replace(/thick hair/gi, 'hair density (confirm with barber)');
+        }
+        if (rec.barberBrief.maintenance && rec.barberBrief.maintenance.toLowerCase().includes('thick hair')) {
+          rec.barberBrief.maintenance = rec.barberBrief.maintenance.replace(/thick hair/gi, 'hair density (confirm with barber)');
+        }
+      }
+    }
+  }
+}
 
 const ai = genkit({
   plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
@@ -114,6 +342,30 @@ export function resolveBestMatch(recommendations: Array<{
   }
 }
 
+export function arePreferencesEqual(
+  a?: { vibe?: string; desiredLength?: string; stylingEffort?: string; note?: string },
+  b?: { vibe?: string; desiredLength?: string; stylingEffort?: string; note?: string }
+): boolean {
+  const normA = {
+    vibe: (a?.vibe || '').trim(),
+    desiredLength: (a?.desiredLength || '').trim(),
+    stylingEffort: (a?.stylingEffort || '').trim(),
+    note: (a?.note || '').trim(),
+  };
+  const normB = {
+    vibe: (b?.vibe || '').trim(),
+    desiredLength: (b?.desiredLength || '').trim(),
+    stylingEffort: (b?.stylingEffort || '').trim(),
+    note: (b?.note || '').trim(),
+  };
+  return (
+    normA.vibe === normB.vibe &&
+    normA.desiredLength === normB.desiredLength &&
+    normA.stylingEffort === normB.stylingEffort &&
+    normA.note === normB.note
+  );
+}
+
 export const recommendationFlow = ai.defineFlow({
   name: 'recommendationFlow',
   inputSchema: z.object({
@@ -131,7 +383,7 @@ export const recommendationFlow = ai.defineFlow({
     message: z.string()
   })
 }, async (input) => {
-  const state = revisions.get(input.revisionId);
+  const state = await getOrHydrateRevision(input.revisionId);
   
   if (!state) {
     return { route: 'STALE' as const, message: 'Revision not found.' };
@@ -145,20 +397,45 @@ export const recommendationFlow = ai.defineFlow({
     return { route: 'STALE' as const, message: 'Missing analysis.' };
   }
 
-  // T4.3: Store preferences
-  if (input.preferences) {
-    state.preferences = input.preferences;
+  // 1. In-flight promise guard: reuse in-flight execution if incoming preferences match
+  while (state.recommendationPromise) {
+    if (arePreferencesEqual(state.recommendationPromisePreferences, input.preferences)) {
+      return await state.recommendationPromise;
+    }
+    // If incoming preferences differ, await the current in-flight generation to settle
+    try {
+      await state.recommendationPromise;
+    } catch {
+      // Ignore errors from preceding request; proceed with new preferences
+    }
   }
 
-  try {
-    const promptParams = {
-      analysis: state.analysis,
-      preferences: state.preferences
+  // 2. Safe reuse of completed recommendations for identical preferences
+  if (
+    (state.status === 'RECOMMENDATIONS_READY' || state.status === 'READY_FOR_PREVIEW') &&
+    state.recommendations &&
+    state.recommendations.length > 0 &&
+    arePreferencesEqual(state.preferences, input.preferences)
+  ) {
+    return {
+      route: 'SUCCESS' as const,
+      recommendations: { recommendations: state.recommendations },
+      message: 'Recommendations already generated.'
     };
+  }
 
-    const { output } = await ai.generate({
-      model: 'googleai/gemini-3.5-flash',
-      prompt: `Generate up to 3 distinct hairstyle recommendations based on this analysis and user preferences.
+  state.recommendationPromisePreferences = input.preferences ? { ...input.preferences } : undefined;
+
+  state.recommendationPromise = (async () => {
+    try {
+      const promptParams = {
+        analysis: state.analysis,
+        preferences: input.preferences
+      };
+
+      const { output } = await ai.generate({
+        model: 'googleai/gemini-3.5-flash',
+        prompt: `Generate up to 3 distinct hairstyle recommendations based on this analysis and user preferences.
       
       Analysis: ${JSON.stringify(promptParams.analysis)}
       Preferences: ${JSON.stringify(promptParams.preferences || {})}
@@ -167,50 +444,75 @@ export const recommendationFlow = ai.defineFlow({
       1. Strictly adhere to the requested JSON schema.
       2. Provide up to 3 distinct recommendations.
       3. Exactly one recommendation should have isBestMatch = true with a bestMatchReason. Prioritize realistic options ('Ready Now' or 'Possible with Adjustment') over unrealistic ones ('Not Currently Realistic') unless no realistic alternative exists.
-      4. Ground the reasons in the user's hair attributes (face shape, hair line, length).
-      5. Note is untrusted user input, apply safely. If the note specifies a current condition, treat as starting hair state; if a target style, treat as desired preference.
-      6. Do not invent fake accuracy percentages.
-      7. Determine feasibility based on existing analysis, current hair condition, target hairstyle, and constraints.
+      4. Professional Canonical Names: Hairstyle names MUST be standard industry names (e.g. 'Classic Crew Cut', 'Textured Quiff', 'Side Part', 'French Crop'). NEVER append user notes, slang, or parentheticals to the hairstyle name (e.g. NEVER output 'Classic Crew Cut (Cepak)' or 'Crew Cut (cepak)' - output 'Classic Crew Cut').
+      5. Structured Reason Evidence: Populate structured reasonEvidence items for each recommendation grounded directly in the supplied analysis and user preferences:
+         - attribute: 'Face Shape', 'Hair Pattern', 'Hair Length', 'Hair Thickness', 'Hairline', or 'User Note'
+         - value: standard attribute value (e.g. 'Oval', 'Straight', 'Short', 'Thick', 'Cepak')
+         - source: MUST match the provenance from analysis ('Observed' or 'Inferred' or 'Unknown'), or 'User-provided' for preferences/notes.
+         - contribution: Clear rationale of how this attribute supports the cut.
+      6. Attribute Provenance & Cautious Wording:
+         - Keep 'Observed', 'Inferred', and 'Unknown' distinctions strictly accurate.
+         - NEVER present inferred attributes as confirmed observations. Use cautious phrasing (e.g. 'Likely oval face', 'Appears to have thicker density').
+         - NEVER invent claims about unknown attributes. If an attribute is unknown, state that density or texture should be confirmed with the barber.
+      7. User Preferences Separation:
+         - User notes (e.g. 'cepak') and preferences are strictly 'User-provided' preferences, NEVER photo observations.
+         - User notes may influence haircut selection and length, but must never be presented as photo evidence or appended to the canonical name.
+      8. Ground the reasons in the user's hair attributes (face shape, hair line, length).
+      9. Determine feasibility based on existing analysis, current hair condition, target hairstyle, and constraints.
          - 'Ready Now': realistically achievable now.
          - 'Possible with Adjustment': achievable with reasonable adjustment.
          - 'Transition Required': requires meaningful transition/grow-out.
          - 'Not Currently Realistic': not realistically achievable.
-      8. For 'Transition Required' or 'Not Currently Realistic', provide transitionGuidance explaining limitations or what needs to change.
-      9. Do not invent unsupported exact measurements, timelines, hair growth rates, or technical details not supported by analysis.
-      10. Generate a structured barberBrief organizing practical handoff information into top, sides, back, fringe, styling, maintenance, preserve, and avoid.
-      11. Measurement Safety: Do NOT invent unsupported exact measurements (e.g. millimetres, inches, neckline measurements, crown measurements, clipper guard numbers). When an exact detail cannot be reliably determined from the available evidence, use "Confirm with barber". Do not fabricate precision.`,
-      output: {
-        schema: RecommendationSchema
+      10. For 'Transition Required' or 'Not Currently Realistic', provide transitionGuidance explaining limitations or what needs to change.
+      11. Do not invent unsupported exact measurements, timelines, hair growth rates, or technical details not supported by analysis.
+      12. Generate a structured barberBrief organizing practical handoff information into top, sides, back, fringe, styling, maintenance, preserve, and avoid. Ensure barber brief does not contradict analysis.
+      13. Measurement Safety: Do NOT invent unsupported exact measurements (e.g. millimetres, inches, neckline measurements, crown measurements, clipper guard numbers). When an exact detail cannot be reliably determined from the available evidence, use "Confirm with barber". Do not fabricate precision.`,
+        output: {
+          schema: RecommendationSchema
+        }
+      });
+
+      const recommendationsResult = output;
+
+      if (!recommendationsResult || recommendationsResult.recommendations.length === 0) {
+        throw new Error('No recommendations generated.');
       }
-    });
 
-    const recommendationsResult = output;
+      // Resolve and validate best match deterministically based on feasibility
+      resolveBestMatch(recommendationsResult.recommendations);
 
-    if (!recommendationsResult || recommendationsResult.recommendations.length === 0) {
-      throw new Error('No recommendations generated.');
+      // Validate and align evidence provenance, canonical names, and consistency
+      validateAndAlignEvidence(
+        recommendationsResult.recommendations,
+        state.analysis,
+        input.preferences
+      );
+
+      state.status = 'RECOMMENDATIONS_READY';
+      state.recommendations = recommendationsResult.recommendations;
+      state.preferences = input.preferences ? { ...input.preferences } : undefined;
+      // T4.5: Reset selection when generating new recommendations
+      state.selectedHairstyleId = undefined;
+
+      await saveRevision(input.revisionId, state);
+
+      return { route: 'SUCCESS' as const, recommendations: recommendationsResult, message: 'Recommendations ready.' };
+    } catch (err: any) {
+      console.error('Recommendation error:', err);
+      return { route: 'RETRY_REQUIRED' as const, message: err.message || 'Recommendation failed.' };
+    } finally {
+      state.recommendationPromise = undefined;
+      state.recommendationPromisePreferences = undefined;
     }
+  })();
 
-    // Resolve and validate best match deterministically based on feasibility
-    resolveBestMatch(recommendationsResult.recommendations);
-
-    state.status = 'RECOMMENDATIONS_READY';
-    state.recommendations = recommendationsResult.recommendations;
-    // T4.5: Reset selection when generating new recommendations
-    state.selectedHairstyleId = undefined;
-
-    await saveRevision(input.revisionId, state);
-
-    return { route: 'SUCCESS' as const, recommendations: recommendationsResult, message: 'Recommendations ready.' };
-  } catch (err: any) {
-    console.error('Recommendation error:', err);
-    return { route: 'RETRY_REQUIRED' as const, message: err.message || 'Recommendation failed.' };
-  }
+  return await state.recommendationPromise;
 });
 
 // T4.7: Deterministic endpoint to select a hairstyle
 export const selectHairstyleHandler = async (req: Request, res: Response) => {
   const { revisionId, hairstyleId } = req.body;
-  const state = revisions.get(revisionId);
+  const state = await getOrHydrateRevision(revisionId);
 
   if (!state || !state.recommendations) {
     return res.status(400).json({ status: 'error', message: 'Invalid state for selection.' });

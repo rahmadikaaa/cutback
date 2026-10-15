@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import { healthHandler } from './health';
+import { healthHandler, firestoreHealthHandler } from './health';
 import { smokeTestHandler } from './smoke';
 import { uploadHandler } from './upload';
 import { analysisHandler } from './analysis';
@@ -19,6 +19,7 @@ const upload = multer({
 });
 
 app.get('/health', healthHandler);
+app.get('/health/firestore', firestoreHealthHandler);
 app.post('/diagnostic/smoke', smokeTestHandler);
 app.post('/api/upload', upload.single('photo'), uploadHandler);
 app.post('/api/analyze', analysisHandler);

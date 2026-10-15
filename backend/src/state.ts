@@ -12,6 +12,13 @@ export interface RevisionState {
     note?: string;
   };
   recommendations?: any[];
+  recommendationPromise?: Promise<any>;
+  recommendationPromisePreferences?: {
+    vibe?: string;
+    desiredLength?: string;
+    stylingEffort?: string;
+    note?: string;
+  };
   selectedHairstyleId?: string;
   previewState?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'STALE' | 'SKIPPED';
   previewImageUrl?: string;

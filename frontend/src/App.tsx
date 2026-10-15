@@ -27,6 +27,7 @@ type Screen =
   | 'analysis-results'
   | 'preferences'
   | 'recommendations'
+  | 'customize-look'
   | 'preview-loading'
   | 'preview-failure'
   | 'preview'
@@ -58,13 +59,21 @@ interface SavedHaircut {
 
 // ── Data ──────────────────────────────────────────────────────────────────
 
+export interface ReasonEvidenceDisplayItem {
+  obs: string
+  contribution: string
+  source?: 'Observed' | 'Inferred' | 'User-provided' | 'Unknown'
+  attribute?: string
+  value?: string
+}
+
 export interface HairstyleItem {
   id: number
   backendId?: string
   name: string
   description: string
   reason: string
-  reasonEvidence: { obs: string; contribution: string }[]
+  reasonEvidence: ReasonEvidenceDisplayItem[]
   effort: string
   effortDetail: string
   limitation: string
@@ -101,6 +110,22 @@ function extractSource(attr: any): string {
   return typeof attr === 'string' ? 'Unknown' : attr.source
 }
 
+export function cleanCanonicalHaircutName(name: string, userNote?: string): string {
+  if (!name) return name
+  let cleaned = name.trim()
+
+  if (userNote && userNote.trim()) {
+    const rawNote = userNote.trim()
+    const escaped = rawNote.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    cleaned = cleaned.replace(new RegExp(`\\s*(?:[(-/:]\\s*)*\\b${escaped}\\b\\s*[)]?`, 'gi'), '').trim()
+  }
+
+  cleaned = cleaned.replace(/\s*\((?:cepak|buzz\s*cut|pendek|rapirapi|spiky|undercut|fade|taper|side\s*part|quiff)\)/gi, '').trim()
+  cleaned = cleaned.replace(/[\s\-_:/(]+$/, '').trim()
+
+  return cleaned || name.trim()
+}
+
 function mapBackendRecommendations(
   items: BackendRecommendationItem[],
   analysisData: AnalysisData | null,
@@ -125,36 +150,97 @@ function mapBackendRecommendations(
         ? rec.constraints.join('. ')
         : 'Requires regular maintenance cuts'
 
-    const evidence: { obs: string; contribution: string }[] = []
+    const userNote = (prefs as any)?.notes || (prefs as any)?.note || ''
+    const evidence: ReasonEvidenceDisplayItem[] = []
 
-    if (rec.isBestMatch && rec.bestMatchReason) {
-      evidence.push({ obs: 'Best Match', contribution: rec.bestMatchReason })
-    }
+    if (rec.reasonEvidence && Array.isArray(rec.reasonEvidence) && rec.reasonEvidence.length > 0) {
+      for (const item of rec.reasonEvidence as any[]) {
+        if (item.obs && !item.attribute) {
+          // Backward compatibility for legacy test fixtures with { obs, contribution }
+          evidence.push({
+            obs: item.obs,
+            contribution: item.contribution || '',
+            source: item.source || 'Observed',
+          })
+          continue
+        }
 
-    const faceVal = extractValue(analysisData?.attributes?.faceShape)
-    if (faceVal !== 'unknown') {
-      evidence.push({
-        obs: `${faceVal.charAt(0).toUpperCase() + faceVal.slice(1)} face`,
-        contribution: 'proportions naturally framed by this cut',
-      })
-    }
+        const attr = item.attribute || ''
+        const val = item.value || ''
+        let obsLabel = `${val} ${attr.toLowerCase()}`.trim()
+        if (item.source === 'Inferred') {
+          obsLabel = `${val} ${attr.toLowerCase()}`.trim()
+        } else if (item.source === 'User-provided') {
+          obsLabel = `Preference: ${val}`
+        } else if (item.source === 'Unknown') {
+          obsLabel = `${attr} (undetermined)`
+        }
 
-    const hairVal = extractValue(analysisData?.attributes?.hairType)
-    if (hairVal !== 'unknown') {
-      evidence.push({
-        obs: `${hairVal.charAt(0).toUpperCase() + hairVal.slice(1)} pattern`,
-        contribution: 'works with natural movement',
-      })
+        evidence.push({
+          obs: obsLabel || val || attr || 'Aligned feature',
+          contribution: item.contribution || '',
+          source: item.source,
+          attribute: item.attribute,
+          value: item.value,
+        })
+      }
+    } else {
+      // Fallback: derive grounded evidence from analysisData and preferences
+      const faceVal = extractValue(analysisData?.attributes?.faceShape)
+      const faceSrc = extractSource(analysisData?.attributes?.faceShape) as 'Observed' | 'Inferred' | 'User-provided' | 'Unknown'
+      if (faceVal !== 'unknown') {
+        const valCap = faceVal.charAt(0).toUpperCase() + faceVal.slice(1)
+        evidence.push({
+          obs: `${valCap} face`,
+          contribution: faceSrc === 'Inferred'
+            ? 'likely proportions naturally framed by this cut'
+            : 'proportions naturally framed by this cut',
+          source: faceSrc,
+          attribute: 'Face Shape',
+          value: valCap,
+        })
+      }
+
+      const hairVal = extractValue(analysisData?.attributes?.hairType)
+      const hairSrc = extractSource(analysisData?.attributes?.hairType) as 'Observed' | 'Inferred' | 'User-provided' | 'Unknown'
+      if (hairVal !== 'unknown') {
+        const valCap = hairVal.charAt(0).toUpperCase() + hairVal.slice(1)
+        evidence.push({
+          obs: `${valCap} pattern`,
+          contribution: hairSrc === 'Inferred'
+            ? 'appears to work with natural movement'
+            : 'works with natural movement',
+          source: hairSrc,
+          attribute: 'Hair Pattern',
+          value: valCap,
+        })
+      }
+
+      if (userNote && userNote.trim()) {
+        evidence.push({
+          obs: `Preference: ${userNote.trim()}`,
+          contribution: 'personal preference guiding shorter, clean profile',
+          source: 'User-provided',
+          attribute: 'User Preference',
+          value: userNote.trim(),
+        })
+      }
     }
 
     if (evidence.length === 0) {
-      evidence.push({ obs: 'Feature alignment', contribution: 'harmonises with your facial structure' })
+      evidence.push({
+        obs: 'Feature alignment',
+        contribution: 'harmonises with your facial structure',
+        source: 'Observed',
+      })
     }
+
+    const canonicalName = cleanCanonicalHaircutName(rec.name, userNote)
 
     return {
       id: index,
       backendId: rec.id,
-      name: rec.name,
+      name: canonicalName,
       description: rec.description,
       reason: rec.reason,
       reasonEvidence: evidence,
@@ -177,7 +263,7 @@ function mapBackendRecommendations(
   })
 }
 
-const HAIRSTYLES: HairstyleItem[] = [
+export const DEMO_FIXTURE_HAIRSTYLES: HairstyleItem[] = [
   {
     id: 0,
     name: 'Textured Quiff',
@@ -250,7 +336,7 @@ const ANALYSIS_STEPS = [
   'Building your recommendations',
 ]
 
-const ANALYSIS_OBS = [
+export const DEMO_FIXTURE_ANALYSIS_OBS = [
   { label: 'Face shape', value: 'Oval', source: 'Observed' },
   { label: 'Hair pattern', value: 'Natural wave', source: 'Observed' },
   { label: 'Current length', value: 'Short-medium', source: 'Observed' },
@@ -1035,40 +1121,61 @@ function AnalysisResultsScreen({
   onRecommendations: () => void
   onBack: () => void
 }) {
-  const displayObs = analysisData?.attributes
-    ? [
-      {
-        label: 'Face shape',
-        value: formatAttrValue(extractValue(analysisData.attributes.faceShape)),
-        source: extractSource(analysisData.attributes.faceShape),
-      },
-      {
-        label: 'Hair pattern',
-        value: formatAttrValue(extractValue(analysisData.attributes.hairType)),
-        source: extractSource(analysisData.attributes.hairType),
-      },
-      {
-        label: 'Current length',
-        value: formatAttrValue(extractValue(analysisData.attributes.hairLength)),
-        source: extractSource(analysisData.attributes.hairLength),
-      },
-      {
-        label: 'Hairline',
-        value: formatAttrValue(extractValue(analysisData.attributes.hairLine)),
-        source: extractSource(analysisData.attributes.hairLine),
-      },
-      {
-        label: 'Hair thickness',
-        value: formatAttrValue(extractValue(analysisData.attributes.hairThickness)),
-        source: extractSource(analysisData.attributes.hairThickness),
-      },
-      {
-        label: 'Visual Suitability',
-        value: analysisData.visualSuitability.isValid ? 'Verified' : 'Flagged',
-        source: analysisData.visualSuitability.isValid ? 'Observed' : 'Unknown',
-      },
-    ]
-    : ANALYSIS_OBS
+  if (!analysisData?.attributes) {
+    return (
+      <div className="screen-enter min-h-dvh flex flex-col px-5 pt-12 pb-8" style={{ background: 'var(--background)' }}>
+        <BackBtn onBack={onBack} />
+        <div className="flex-1 flex flex-col items-center justify-center text-center pt-8">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)' }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M14 9v6M14 19v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round"/></svg>
+          </div>
+          <h2 className="font-display text-2xl mb-2" style={{ color: 'var(--foreground)' }}>No Analysis Available</h2>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--muted-foreground)', maxWidth: 280 }}>
+            Photo analysis data is unavailable for this session. Please retake or upload a clear photo to continue.
+          </p>
+          <div className="w-24 h-24 rounded-xl overflow-hidden mb-6">
+            <img src={photo} alt="Your photo" className="w-full h-full object-cover object-top" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <PrimaryBtn onClick={onBack}>Upload New Photo</PrimaryBtn>
+        </div>
+      </div>
+    )
+  }
+
+  const displayObs = [
+    {
+      label: 'Face shape',
+      value: formatAttrValue(extractValue(analysisData.attributes.faceShape)),
+      source: extractSource(analysisData.attributes.faceShape),
+    },
+    {
+      label: 'Hair pattern',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairType)),
+      source: extractSource(analysisData.attributes.hairType),
+    },
+    {
+      label: 'Current length',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairLength)),
+      source: extractSource(analysisData.attributes.hairLength),
+    },
+    {
+      label: 'Hairline',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairLine)),
+      source: extractSource(analysisData.attributes.hairLine),
+    },
+    {
+      label: 'Hair thickness',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairThickness)),
+      source: extractSource(analysisData.attributes.hairThickness),
+    },
+    {
+      label: 'Visual Suitability',
+      value: analysisData.visualSuitability.isValid ? 'Verified' : 'Flagged',
+      source: analysisData.visualSuitability.isValid ? 'Observed' : 'Unknown',
+    },
+  ]
 
   return (
     <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>
@@ -1134,35 +1241,48 @@ function AnalysisResultsScreen({
   )
 }
 
-// ── PreferencesScreen ──────────────────────────────────────────────────────
+// ── CustomizeYourLookScreen ────────────────────────────────────────────────
 
-function PreferencesScreen({
-  prefs, setPrefs, onSkip, onApply, onBack,
-}: { prefs: Prefs; setPrefs: (p: Prefs) => void; onSkip: () => void; onApply: () => void; onBack: () => void }) {
+function CustomizeYourLookScreen({
+  initialPrefs,
+  onApply,
+  onBack,
+  showSkip = false,
+  onSkip,
+}: {
+  initialPrefs: Prefs
+  onApply: (newPrefs: Prefs) => void
+  onBack: () => void
+  showSkip?: boolean
+  onSkip?: () => void
+}) {
+  const [draft, setDraft] = useState<Prefs>({ ...initialPrefs })
+
   return (
     <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>
       <div className="flex items-center gap-3 px-5 pt-12 pb-5 flex-shrink-0">
         <BackBtn onBack={onBack} />
         <div>
-          <h2 className="font-display text-2xl" style={{ color: 'var(--foreground)' }}>Your Direction</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>All optional — skip to see recommendations</p>
+          <h2 className="font-display text-2xl" style={{ color: 'var(--foreground)' }}>Customize Your Look</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>Make your recommendations more personal.</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-6">
-        {/* Vibe */}
+        {/* Style / Vibe */}
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>How do you want to look?</p>
+          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>What style do you like?</p>
           <div className="flex flex-wrap gap-2">
             {VIBES.map(v => (
               <button
                 key={v}
-                onClick={() => setPrefs({ ...prefs, vibe: prefs.vibe === v ? '' : v })}
+                type="button"
+                onClick={() => setDraft(prev => ({ ...prev, vibe: prev.vibe === v ? '' : v }))}
                 className="px-4 py-2.5 rounded-lg text-sm font-medium transition-all active:scale-95"
                 style={{
-                  background: prefs.vibe === v ? '#c9a96e' : 'var(--secondary)',
-                  color: prefs.vibe === v ? '#080c14' : 'var(--foreground)',
-                  border: prefs.vibe === v ? '1px solid #c9a96e' : '1px solid var(--border)',
+                  background: draft.vibe === v ? '#c9a96e' : 'var(--secondary)',
+                  color: draft.vibe === v ? '#080c14' : 'var(--foreground)',
+                  border: draft.vibe === v ? '1px solid #c9a96e' : '1px solid var(--border)',
                   minHeight: 44,
                 }}
               >{v}</button>
@@ -1172,17 +1292,18 @@ function PreferencesScreen({
 
         {/* Length */}
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Length direction</p>
+          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>How long do you want your hair?</p>
           <div className="flex gap-2">
             {LENGTHS.map(l => (
               <button
                 key={l}
-                onClick={() => setPrefs({ ...prefs, length: prefs.length === l ? '' : l })}
+                type="button"
+                onClick={() => setDraft(prev => ({ ...prev, length: prev.length === l ? '' : l }))}
                 className="flex-1 py-3 rounded-lg text-xs font-medium text-center transition-all active:scale-95"
                 style={{
-                  background: prefs.length === l ? '#c9a96e' : 'var(--secondary)',
-                  color: prefs.length === l ? '#080c14' : 'var(--foreground)',
-                  border: prefs.length === l ? '1px solid #c9a96e' : '1px solid var(--border)',
+                  background: draft.length === l ? '#c9a96e' : 'var(--secondary)',
+                  color: draft.length === l ? '#080c14' : 'var(--foreground)',
+                  border: draft.length === l ? '1px solid #c9a96e' : '1px solid var(--border)',
                   minHeight: 44,
                 }}
               >{l}</button>
@@ -1190,19 +1311,20 @@ function PreferencesScreen({
           </div>
         </div>
 
-        {/* Effort */}
+        {/* Styling Effort */}
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Daily styling effort</p>
+          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>How much time do you spend styling?</p>
           <div className="flex gap-2">
             {EFFORTS.map(e => (
               <button
                 key={e.id}
-                onClick={() => setPrefs({ ...prefs, effort: prefs.effort === e.id ? '' : e.id })}
+                type="button"
+                onClick={() => setDraft(prev => ({ ...prev, effort: prev.effort === e.id ? '' : e.id }))}
                 className="flex-1 py-3 rounded-lg text-center transition-all active:scale-95"
                 style={{
-                  background: prefs.effort === e.id ? '#c9a96e' : 'var(--secondary)',
-                  color: prefs.effort === e.id ? '#080c14' : 'var(--foreground)',
-                  border: prefs.effort === e.id ? '1px solid #c9a96e' : '1px solid var(--border)',
+                  background: draft.effort === e.id ? '#c9a96e' : 'var(--secondary)',
+                  color: draft.effort === e.id ? '#080c14' : 'var(--foreground)',
+                  border: draft.effort === e.id ? '1px solid #c9a96e' : '1px solid var(--border)',
                   minHeight: 52,
                 }}
               >
@@ -1213,28 +1335,40 @@ function PreferencesScreen({
           </div>
         </div>
 
-        {/* Notes */}
+        {/* Anything else? */}
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Anything else? (optional)</p>
+          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Anything else?</p>
           <textarea
-            value={prefs.notes}
-            onChange={e => { if (e.target.value.length <= 500) setPrefs({ ...prefs, notes: e.target.value }) }}
-            placeholder="E.g. 'want to try something different' or 'my barber always cuts it too short'"
+            value={draft.notes}
+            onChange={e => { if (e.target.value.length <= 500) setDraft(prev => ({ ...prev, notes: e.target.value })) }}
+            placeholder="E.g. 'Keep the sides professional-looking' or 'Prefer low maintenance'"
             rows={3}
+            maxLength={500}
             className="w-full rounded-xl p-4 text-sm resize-none"
             style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', fontFamily: 'var(--font-sans)', minHeight: 88 }}
           />
-          <p className="text-xs mt-1 text-right" style={{ color: 'var(--muted-foreground)' }}>{prefs.notes.length}/500</p>
+          <p className="text-xs mt-1 text-right" style={{ color: 'var(--muted-foreground)' }}>{draft.notes.length}/500</p>
         </div>
 
         <div className="flex gap-3 pt-2">
+          {showSkip && onSkip ? (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="flex-1 py-4 rounded-xl font-medium text-sm transition-all active:scale-[0.98]"
+              style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', minHeight: 52 }}
+            >Skip</button>
+          ) : (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex-1 py-4 rounded-xl font-medium text-sm transition-all active:scale-[0.98]"
+              style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', minHeight: 52 }}
+            >Back</button>
+          )}
           <button
-            onClick={onSkip}
-            className="flex-1 py-4 rounded-xl font-medium text-sm transition-all active:scale-[0.98]"
-            style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', minHeight: 52 }}
-          >Skip</button>
-          <button
-            onClick={onApply}
+            type="button"
+            onClick={() => onApply(draft)}
             className="flex-[2] py-4 rounded-xl font-medium text-sm transition-all active:scale-[0.98]"
             style={{ background: '#c9a96e', color: '#080c14', minHeight: 52 }}
           >Apply & See Recommendations</button>
@@ -1246,54 +1380,11 @@ function PreferencesScreen({
 
 // ── RecommendationsScreen ──────────────────────────────────────────────────
 
-// Evidence chain — grounded in observed + intent
-function ConvergeChain({ rec, prefs, animKey }: { rec: HairstyleItem; prefs: Prefs; animKey: number }) {
-  const intentItems = [
-    prefs.vibe ? `Vibe: ${prefs.vibe}` : null,
-    prefs.effort ? `Effort: ${prefs.effort}` : null,
-    prefs.length ? `Length: ${prefs.length}` : null,
-  ].filter(Boolean) as string[]
-
-  return (
-    <div key={`c-${animKey}`} className="converge-enter rounded-xl p-4 mb-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-      <p className="uppercase mb-3" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.12em' }}>Why this works for you</p>
-
-      {/* Evidence rows */}
-      <div className="space-y-1.5 mb-3">
-        {rec.reasonEvidence.map((e, i) => (
-          <div key={i} className="flex items-start gap-2">
-            <div className="flex-shrink-0 mt-1 w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(201,169,110,0.55)' }} />
-            <div className="flex-1 min-w-0">
-              <span className="text-xs font-medium" style={{ color: '#c9a96e' }}>{e.obs}</span>
-              <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}> — {e.contribution}</span>
-            </div>
-          </div>
-        ))}
-        {intentItems.length > 0 && intentItems.map((item, i) => (
-          <div key={`intent-${i}`} className="flex items-start gap-2">
-            <div className="flex-shrink-0 mt-1 w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(240,235,224,0.25)' }} />
-            <div className="flex-1 min-w-0">
-              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.55)' }}>{item}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Arrow + result */}
-      <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-          <path d="M2 7h10M8 3l4 4-4 4" stroke="#c9a96e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <p className="text-xs font-medium" style={{ color: 'var(--foreground)' }}>{rec.reason}</p>
-      </div>
-    </div>
-  )
-}
-
 function RecommendationsScreen({
   photo,
   prefs,
   recommendations,
+  analysisData,
   loading,
   errorMessage,
   onRetry,
@@ -1302,11 +1393,13 @@ function RecommendationsScreen({
   chosenRec,
   setChosenRec,
   onSeePreview,
+  onCustomize,
   onBack,
 }: {
   photo: string
   prefs: Prefs
   recommendations: HairstyleItem[]
+  analysisData?: AnalysisData | null
   loading: boolean
   errorMessage: string | null
   onRetry: () => void
@@ -1315,14 +1408,57 @@ function RecommendationsScreen({
   chosenRec: number | null
   setChosenRec: (i: number | null) => void
   onSeePreview: () => void
+  onCustomize: () => void
   onBack: () => void
 }) {
-  const [animKey, setAnimKey] = useState(0)
+  const displayObs = analysisData?.attributes ? [
+    {
+      label: 'Face shape',
+      value: formatAttrValue(extractValue(analysisData.attributes.faceShape)),
+      source: extractSource(analysisData.attributes.faceShape),
+    },
+    {
+      label: 'Hair pattern',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairType)),
+      source: extractSource(analysisData.attributes.hairType),
+    },
+    {
+      label: 'Current length',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairLength)),
+      source: extractSource(analysisData.attributes.hairLength),
+    },
+    {
+      label: 'Hairline',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairLine)),
+      source: extractSource(analysisData.attributes.hairLine),
+    },
+    {
+      label: 'Hair thickness',
+      value: formatAttrValue(extractValue(analysisData.attributes.hairThickness)),
+      source: extractSource(analysisData.attributes.hairThickness),
+    },
+    {
+      label: 'Visual Suitability',
+      value: analysisData.visualSuitability?.isValid ? 'Verified' : 'Flagged',
+      source: analysisData.visualSuitability?.isValid ? 'Observed' : 'Unknown',
+    },
+  ] : []
+
+  const hasAppliedPrefs = Boolean(
+    (prefs.vibe && prefs.vibe.trim()) ||
+    (prefs.length && prefs.length.trim()) ||
+    (prefs.effort && prefs.effort.trim()) ||
+    (prefs.notes && prefs.notes.trim())
+  )
+
+  const effortLabel = prefs.effort
+    ? (EFFORTS.find(e => e.id === prefs.effort)?.label || prefs.effort)
+    : ''
 
   if (loading) {
     return (
       <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>
-        <div className="relative flex-shrink-0" style={{ height: '52vh' }}>
+        <div className="relative flex-shrink-0" style={{ height: '48vh' }}>
           <img src={photo} alt="Your photo" className="w-full h-full object-cover object-top" style={{ opacity: 0.65, filter: 'blur(1px)' }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(8,12,20,0.5) 0%, transparent 35%, rgba(8,12,20,0.85) 75%, rgba(8,12,20,1) 100%)' }} />
           <div className="absolute top-12 left-5">
@@ -1370,113 +1506,217 @@ function RecommendationsScreen({
     )
   }
 
-  const list = recommendations.length > 0 ? recommendations : HAIRSTYLES
-  const safeActiveRec = Math.min(activeRec, list.length - 1)
-  const rec = list[safeActiveRec]
-  const isActive = chosenRec === safeActiveRec
-  const hasChosen = chosenRec !== null
-
-  function go(dir: 1 | -1) {
-    setAnimKey(k => k + 1)
-    setActiveRec((safeActiveRec + dir + list.length) % list.length)
+  if (recommendations.length === 0) {
+    return (
+      <div className="screen-enter min-h-dvh flex flex-col px-5 pt-12 pb-8" style={{ background: 'var(--background)' }}>
+        <BackBtn onBack={onBack} />
+        <div className="flex-1 flex flex-col items-center text-center pt-10">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)' }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 6v8m0 4v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round" /><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" /></svg>
+          </div>
+          <h2 className="font-display text-2xl mb-3" style={{ color: 'var(--foreground)' }}>No recommendations found</h2>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--muted-foreground)', maxWidth: 280 }}>
+            We could not find matching recommendations for your photo. Try generating again or adjust your preferences.
+          </p>
+          <div className="w-24 h-24 rounded-xl overflow-hidden mb-5">
+            <img src={photo} alt="Your photo" className="w-full h-full object-cover object-top" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <PrimaryBtn onClick={onRetry}>Get Recommendations</PrimaryBtn>
+          <GhostBtn onClick={onBack}>Back to Direction</GhostBtn>
+        </div>
+      </div>
+    )
   }
+
+  const safeActiveRec = Math.min(Math.max(0, activeRec), recommendations.length - 1)
+  const rec = recommendations[safeActiveRec]
+
+  // Ensure chosenRec is selected by default so the active cut is chosen
+  useEffect(() => {
+    if (recommendations.length > 0 && (chosenRec === null || chosenRec !== safeActiveRec)) {
+      setChosenRec(safeActiveRec)
+    }
+  }, [chosenRec, safeActiveRec, setChosenRec, recommendations.length])
 
   return (
     <div className="screen-enter min-h-dvh flex flex-col" style={{ background: 'var(--background)' }}>
-      {/* Portrait anchor — user identity stays locked */}
-      <div className="relative flex-shrink-0" style={{ height: '52vh' }}>
+      {/* Portrait anchor — clean & unobstructed (no text/cards/controls over the photo) */}
+      <div className="relative flex-shrink-0" style={{ height: '48vh' }}>
         <img src={photo} alt="Your photo" className="w-full h-full object-cover object-top" />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(8,12,20,0.52) 0%, transparent 25%, rgba(8,12,20,0.72) 70%, rgba(8,12,20,1) 100%)' }} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(8,12,20,0.4) 0%, transparent 20%, transparent 80%, rgba(8,12,20,0.85) 100%)' }} />
 
-        {/* Nav row */}
-        <div className="absolute top-12 left-5 right-5 flex items-center justify-between">
+        {/* Top navigation row with Back button only */}
+        <div className="absolute top-12 left-5">
           <BackBtn onBack={onBack} />
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-medium" style={{ color: 'rgba(240,235,224,0.55)' }}>
-              {safeActiveRec + 1} / {list.length}
-            </span>
-            <ProgressDots total={list.length} active={safeActiveRec} chosen={chosenRec} />
-          </div>
-        </div>
-
-        {/* Animated name overlay */}
-        <div className="absolute bottom-0 left-5 right-5 pb-3">
-          <div key={animKey} className="rec-content">
-            {rec.bestMatch && (
-              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                <span
-                  className="inline-block px-2 py-0.5 rounded text-xs font-medium"
-                  style={{ background: 'rgba(201,169,110,0.18)', color: '#c9a96e', border: '1px solid rgba(201,169,110,0.3)' }}
-                >
-                  Best Match
-                </span>
-                {rec.bestMatchReason && (
-                  <span className="text-xs" style={{ color: 'rgba(201,169,110,0.9)' }}>
-                    • {rec.bestMatchReason}
-                  </span>
-                )}
-              </div>
-            )}
-            <h2 className="font-display text-[32px] leading-tight" style={{ color: 'var(--foreground)' }}>{rec.name}</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(240,235,224,0.55)' }}>{rec.description}</p>
-          </div>
         </div>
       </div>
 
-      {/* Info + CTAs */}
-      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6">
-        {/* CONVERGE: grounded reasoning chain */}
-        {/* Transformation Journey Card */}
-        <div className="mb-6 rounded-xl p-4 relative" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
-          <div className="mb-4">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--foreground)' }}>✦ YOUR TRANSFORMATION</h3>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>From your current hair to your next look.</p>
-          </div>
-
-          <div className="mb-6 flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.7)' }}>Your Hair ✓</span>
-              <span className="text-[10px]" style={{ color: 'rgba(240,235,224,0.3)' }}>→</span>
-              <div className="relative flex flex-col items-center">
-                <span className="text-xs font-semibold" style={{ color: '#c9a96e' }}>Find Your Look</span>
-                <span className="text-[8px] font-bold absolute -bottom-3.5" style={{ color: '#c9a96e', letterSpacing: '0.05em' }}>↑ ACTIVE</span>
-              </div>
-              <span className="text-[10px]" style={{ color: 'rgba(240,235,224,0.3)' }}>→</span>
-              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.4)' }}>See Yourself</span>
-            </div>
-
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.4)' }}>Barber Ready</span>
-              <span className="text-[10px]" style={{ color: 'rgba(240,235,224,0.3)' }}>→</span>
-              <span className="text-xs" style={{ color: 'rgba(240,235,224,0.4)' }}>Remember</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              if (hasChosen && chosenRec === safeActiveRec) {
-                // User has chosen the currently viewed recommendation and is ready for preview
-                onSeePreview()
-              } else {
-                // Explicitly set chosenRec to the currently viewed recommendation
-                setChosenRec(safeActiveRec)
-              }
-            }}
-            className="w-full py-3 rounded-lg font-medium text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-            style={{
-              background: (hasChosen && chosenRec === safeActiveRec) ? '#c9a96e' : 'rgba(201,169,110,0.12)',
-              color: (hasChosen && chosenRec === safeActiveRec) ? '#080c14' : '#c9a96e',
-              border: (hasChosen && chosenRec === safeActiveRec) ? 'none' : '1px solid rgba(201,169,110,0.3)'
-            }}
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-8">
+        {/* Photo Analysis Observations */}
+        {analysisData?.attributes && (
+          <div
+            className="rounded-xl p-4 mb-4"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
           >
-            {(hasChosen && chosenRec === safeActiveRec) ? 'Continue to Preview' : 'Select This Cut for Journey'} <span className="text-[10px]">→</span>
-          </button>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-display text-xl font-bold" style={{ color: 'var(--foreground)' }}>
+                  What we can see
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(240,235,224,0.55)' }}>
+                  Observed from your photo
+                </p>
+              </div>
+              <span
+                className="px-2 py-0.5 rounded text-[9px] uppercase tracking-wider font-semibold"
+                style={{
+                  background: 'rgba(201,169,110,0.15)',
+                  color: '#c9a96e',
+                  border: '1px solid rgba(201,169,110,0.25)',
+                }}
+              >
+                Analysis
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              {displayObs.map((obs, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl p-3"
+                  style={{
+                    background:
+                      obs.source === 'Unknown' ? 'rgba(138,130,120,0.08)' : 'var(--secondary)',
+                    border: '1px solid var(--border)',
+                    minWidth: 0,
+                  }}
+                >
+                  <div className="flex justify-between items-start mb-1 gap-1">
+                    <p
+                      className="uppercase truncate"
+                      style={{
+                        color: obs.source === 'Unknown' ? 'var(--muted-foreground)' : '#c9a96e',
+                        fontSize: 9,
+                        letterSpacing: '0.1em',
+                      }}
+                    >
+                      {obs.label}
+                    </p>
+                    {obs.source && obs.source !== 'Unknown' && (
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-semibold flex-shrink-0"
+                        style={{
+                          background:
+                            obs.source === 'Inferred'
+                              ? 'rgba(201,169,110,0.2)'
+                              : obs.source === 'User-provided'
+                                ? 'rgba(255,255,255,0.08)'
+                                : 'rgba(201,169,110,0.15)',
+                          color:
+                            obs.source === 'User-provided'
+                              ? 'var(--muted-foreground)'
+                              : '#c9a96e',
+                          border: '1px solid rgba(201,169,110,0.25)',
+                        }}
+                      >
+                        {obs.source}
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className="text-sm font-medium truncate"
+                    style={{
+                      color: obs.source === 'Unknown' ? 'var(--muted-foreground)' : 'var(--foreground)',
+                    }}
+                  >
+                    {obs.value}
+                  </p>
+                  {obs.source === 'Unknown' && (
+                    <p style={{ color: 'var(--muted-foreground)', fontSize: 10 }}>Not observed</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Unified Outer Container: Best Match badge + Haircut Name + Description + Divider + Why This Works For You */}
+        <div
+          key={safeActiveRec}
+          className="rounded-xl p-4 mb-4"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          {rec.bestMatch && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                style={{ background: 'rgba(201,169,110,0.18)', color: '#c9a96e', border: '1px solid rgba(201,169,110,0.3)' }}
+              >
+                Best Match
+              </span>
+              {rec.bestMatchReason && (
+                <span className="text-xs" style={{ color: 'rgba(201,169,110,0.9)' }}>
+                  • {rec.bestMatchReason}
+                </span>
+              )}
+            </div>
+          )}
+
+          <h2 className="font-display text-2xl font-bold leading-tight" style={{ color: 'var(--foreground)' }}>
+            {rec.name}
+          </h2>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
+            {rec.description}
+          </p>
+
+          {/* Subtle internal divider */}
+          <div className="my-3.5" style={{ borderTop: '1px solid var(--border)', opacity: 0.6 }} />
+
+          {/* Existing Rationale: Why This Works For You */}
+          <div>
+            <p className="uppercase mb-2.5 font-semibold" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.12em' }}>
+              Why this works for you
+            </p>
+
+            <div className="space-y-1.5 mb-3">
+              {rec.reasonEvidence.map((e, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <div className="flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(201,169,110,0.6)' }} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium" style={{ color: '#c9a96e' }}>{e.obs}</span>
+                    {e.source && e.source !== 'Observed' && (
+                      <span
+                        className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-normal tracking-wide uppercase inline-block align-middle"
+                        style={{
+                          background: e.source === 'Inferred' ? 'rgba(201,169,110,0.15)' : 'rgba(255,255,255,0.08)',
+                          color: e.source === 'Inferred' ? '#c9a96e' : 'var(--muted-foreground)',
+                          border: '1px solid rgba(201,169,110,0.25)',
+                        }}
+                      >
+                        {e.source}
+                      </span>
+                    )}
+                    <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}> — {e.contribution}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="#c9a96e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <p className="text-xs font-medium leading-snug" style={{ color: 'var(--foreground)' }}>{rec.reason}</p>
+            </div>
+          </div>
         </div>
 
-        <ConvergeChain rec={rec} prefs={prefs} animKey={animKey} />
-
+        {/* Practical Cards: Feasibility */}
         {rec.feasibility && (
-          <div key={`f-${animKey}`} className="rec-content rounded-xl p-4 mb-4" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
+          <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
             <p className="uppercase mb-1" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.1em' }}>Feasibility</p>
             <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{rec.feasibility}</p>
             {rec.transitionGuidance && (
@@ -1485,8 +1725,8 @@ function RecommendationsScreen({
           </div>
         )}
 
-        {/* Effort + limitation row */}
-        <div key={`i-${animKey}`} className="rec-content flex gap-2.5 mb-4">
+        {/* Practical Cards: Effort + Consider row */}
+        <div className="flex gap-2.5 mb-4">
           <div className="flex-1 rounded-xl p-3" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
             <p className="uppercase mb-1" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.1em' }}>Effort</p>
             <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{rec.effort}</p>
@@ -1498,65 +1738,77 @@ function RecommendationsScreen({
           </div>
         </div>
 
-        {/* Previous / Choose This / Next */}
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => go(-1)}
-            aria-label="Previous recommendation"
-            className="flex items-center justify-center rounded-xl transition-all active:scale-90"
-            style={{ background: 'var(--secondary)', border: '1px solid var(--border)', width: 48, height: 48, flexShrink: 0, minWidth: 48 }}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M12.5 5L7.5 10L12.5 15" stroke="#f0ebe0" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setChosenRec(isActive ? null : safeActiveRec)}
-            className="flex-1 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 active:scale-[0.98]"
-            style={{
-              background: isActive ? 'rgba(201,169,110,0.14)' : 'var(--secondary)',
-              color: isActive ? '#c9a96e' : 'var(--foreground)',
-              border: isActive ? '1px solid rgba(201,169,110,0.45)' : '1px solid var(--border)',
-              minHeight: 48,
-            }}
-          >
-            {isActive ? '✓ Selected' : 'Select This Cut'}
-          </button>
-
-          <button
-            onClick={() => go(1)}
-            aria-label="Next recommendation"
-            className="flex items-center justify-center rounded-xl transition-all active:scale-90"
-            style={{ background: 'var(--secondary)', border: '1px solid var(--border)', width: 48, height: 48, flexShrink: 0, minWidth: 48 }}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M7.5 5L12.5 10L7.5 15" stroke="#f0ebe0" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Preview CTA — revealed after choosing, with clear intent label */}
-        <div
-          style={{
-            maxHeight: hasChosen ? 120 : 0,
-            opacity: hasChosen ? 1 : 0,
-            overflow: 'hidden',
-            transition: 'max-height 400ms cubic-bezier(0.22,1,0.36,1), opacity 320ms ease',
-          }}
-        >
-          <div className="pt-1 pb-0.5 px-0.5 rounded-xl mt-1" style={{ background: 'rgba(201,169,110,0.07)', border: '1px solid rgba(201,169,110,0.18)' }}>
-            <p className="text-xs text-center pt-3 pb-2 px-4" style={{ color: 'rgba(240,235,224,0.5)' }}>
-              Your personal preview is generated only for the selected cut
-            </p>
+        {/* Your Preferences Section — Directly Below Feasibility, Effort, and Consider */}
+        <div className="rounded-xl p-4 mb-5" style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-base font-semibold" style={{ color: 'var(--foreground)' }}>Your Preferences</h3>
             <button
-              onClick={onSeePreview}
-              className="w-full py-4 rounded-xl font-medium text-base transition-all active:scale-[0.98]"
-              style={{ background: '#c9a96e', color: '#080c14', minHeight: 56 }}
+              type="button"
+              onClick={onCustomize}
+              className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all active:scale-95"
+              style={{ color: '#c9a96e', background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)' }}
             >
-              Try This Look — Preview on Me
+              {hasAppliedPrefs ? 'Edit' : 'Customize'}
             </button>
           </div>
+
+          {hasAppliedPrefs ? (
+            <div className="mt-3 space-y-2.5">
+              <div className="flex flex-wrap gap-2">
+                {prefs.vibe && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Style:</span>
+                    <span className="font-medium" style={{ color: 'var(--foreground)' }}>{prefs.vibe}</span>
+                  </div>
+                )}
+                {prefs.length && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Hair length:</span>
+                    <span className="font-medium" style={{ color: 'var(--foreground)' }}>{prefs.length}</span>
+                  </div>
+                )}
+                {effortLabel && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--muted-foreground)' }}>Styling effort:</span>
+                    <span className="font-medium" style={{ color: 'var(--foreground)' }}>{effortLabel}</span>
+                  </div>
+                )}
+              </div>
+              {prefs.notes && prefs.notes.trim() && (
+                <div className="pt-2 text-xs leading-relaxed" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted-foreground)' }}>
+                  <span className="font-medium" style={{ color: 'var(--foreground)' }}>Additional notes: </span>
+                  <span style={{ color: 'var(--secondary-foreground)' }}>{prefs.notes}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2.5 flex items-center justify-between">
+              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No additional preferences applied yet.</p>
+              <button
+                type="button"
+                onClick={onCustomize}
+                className="text-xs font-medium"
+                style={{ color: '#c9a96e', textDecoration: 'underline' }}
+              >
+                Customize
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Standalone Primary CTA: Try This Look — Preview on Me */}
+        <div className="mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              setChosenRec(safeActiveRec)
+              onSeePreview()
+            }}
+            className="w-full py-4 rounded-xl font-medium text-base transition-all active:scale-[0.98]"
+            style={{ background: '#c9a96e', color: '#080c14', minHeight: 56 }}
+          >
+            Try This Look — Preview on Me
+          </button>
         </div>
       </div>
     </div>
@@ -2405,7 +2657,7 @@ function MyHaircutsScreen({
           <div className="space-y-3">
             {savedHaircuts.map(hc => {
               const style: HairstyleItem = hc.rec ??
-                (hc.hairstyleId !== undefined ? HAIRSTYLES.find(h => h.id === hc.hairstyleId) : undefined) ??
+                (hc.hairstyleId !== undefined ? DEMO_FIXTURE_HAIRSTYLES.find(h => h.id === hc.hairstyleId) : undefined) ??
                 {
                   id: hc.hairstyleId ?? 0,
                   backendId: hc.backendId,
@@ -2640,6 +2892,26 @@ async function normalizePhoto(fileOrUrl: Blob | string): Promise<{ blob: Blob, u
   });
 }
 
+function RecommendationsUnavailableScreen({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="screen-enter min-h-dvh flex flex-col px-5 pt-12 pb-8" style={{ background: 'var(--background)' }}>
+      <BackBtn onBack={onBack} />
+      <div className="flex-1 flex flex-col items-center justify-center text-center pt-8">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)' }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M14 9v6M14 19v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round"/></svg>
+        </div>
+        <h2 className="font-display text-2xl mb-2" style={{ color: 'var(--foreground)' }}>No Haircut Selected</h2>
+        <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--muted-foreground)', maxWidth: 280 }}>
+          No hairstyle recommendation is currently selected or available. Please return to recommendations.
+        </p>
+      </div>
+      <div className="space-y-3">
+        <PrimaryBtn onClick={onBack}>Back to Recommendations</PrimaryBtn>
+      </div>
+    </div>
+  )
+}
+
 // ── Main App ───────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -2675,7 +2947,7 @@ export default function App() {
 
   const [prefs, setPrefs] = useState<Prefs>({ vibe: '', length: '', effort: '', notes: '' })
 
-  const [recommendations, setRecommendations] = useState<HairstyleItem[]>(HAIRSTYLES)
+  const [recommendations, setRecommendations] = useState<HairstyleItem[]>([])
   const [recsLoading, setRecsLoading] = useState(false)
   const [recsError, setRecsError] = useState<string | null>(null)
 
@@ -2702,10 +2974,13 @@ export default function App() {
 
   const photo = selectedPhoto ?? portrait1
   const analysisPhoto = normalizedPhoto ?? photo
-  const currentChosenHairstyle = recommendations[chosenRec ?? 0] ?? HAIRSTYLES[0]
+  const currentChosenHairstyle = (chosenRec !== null && recommendations[chosenRec])
+    ? recommendations[chosenRec]
+    : (recommendations[0] ?? null)
 
   async function handleSave() {
     const rec = currentChosenHairstyle
+    if (!rec) return
     const id = Math.random().toString(36).slice(2)
 
     let photoBlob: Blob | undefined = undefined
@@ -2832,7 +3107,7 @@ export default function App() {
     })
   }
 
-  async function loadRecommendations(prefsToUse = prefs) {
+  async function loadRecommendations(prefsToUse = prefs, passedAnalysisData?: AnalysisData | null) {
     if (!revisionId) {
       setScreen('recommendations')
       return
@@ -2851,12 +3126,17 @@ export default function App() {
       }
 
       const res = await fetchRecommendations(revisionId, payload)
+      const dataForMapping = passedAnalysisData !== undefined ? passedAnalysisData : analysisData
 
-      if (res.route === 'SUCCESS' && res.recommendations?.recommendations?.length) {
-        const mapped = mapBackendRecommendations(res.recommendations.recommendations, analysisData, prefsToUse)
-        setRecommendations(mapped)
-        setActiveRec(0)
-        setChosenRec(null)
+      if (res.route === 'SUCCESS') {
+        if (res.recommendations?.recommendations?.length) {
+          const mapped = mapBackendRecommendations(res.recommendations.recommendations, dataForMapping, prefsToUse)
+          setRecommendations(mapped)
+          setActiveRec(0)
+          setChosenRec(null)
+        } else {
+          setRecommendations([])
+        }
       } else {
         setRecsError(res.message || 'Could not generate recommendations.')
       }
@@ -2874,7 +3154,7 @@ export default function App() {
     setRevisionId(null)
     setAnalysisData(null)
     setAnalysisError(null)
-    setRecommendations(HAIRSTYLES)
+    setRecommendations([])
     setRecsLoading(false)
     setRecsError(null)
     setPrefs({ vibe: '', length: '', effort: '', notes: '' })
@@ -2926,7 +3206,11 @@ export default function App() {
           revisionId={revisionId}
           onComplete={(data) => {
             setAnalysisData(data)
-            setScreen('analysis-results')
+            if (!data?.attributes) {
+              setScreen('analysis-results')
+            } else {
+              loadRecommendations(prefs, data)
+            }
           }}
           onFail={(msg) => {
             setAnalysisError(msg || 'Analysis failed.')
@@ -2955,12 +3239,26 @@ export default function App() {
       )}
 
       {screen === 'preferences' && (
-        <PreferencesScreen
-          prefs={prefs}
-          setPrefs={setPrefs}
+        <CustomizeYourLookScreen
+          initialPrefs={prefs}
+          showSkip={true}
           onSkip={() => loadRecommendations(prefs)}
-          onApply={() => loadRecommendations(prefs)}
-          onBack={() => setScreen('analysis-results')}
+          onApply={(newPrefs) => {
+            setPrefs(newPrefs)
+            loadRecommendations(newPrefs)
+          }}
+          onBack={() => setScreen('recommendations')}
+        />
+      )}
+
+      {screen === 'customize-look' && (
+        <CustomizeYourLookScreen
+          initialPrefs={prefs}
+          onApply={(newPrefs) => {
+            setPrefs(newPrefs)
+            setScreen('recommendations')
+          }}
+          onBack={() => setScreen('recommendations')}
         />
       )}
 
@@ -2969,6 +3267,7 @@ export default function App() {
           photo={photo}
           prefs={prefs}
           recommendations={recommendations}
+          analysisData={analysisData}
           loading={recsLoading}
           errorMessage={recsError}
           onRetry={() => loadRecommendations(prefs)}
@@ -2981,93 +3280,114 @@ export default function App() {
             setPreviewError(null)
             setScreen('preview-loading')
           }}
-          onBack={() => setScreen('analysis-results')}
+          onCustomize={() => setScreen('customize-look')}
+          onBack={() => setScreen('upload')}
         />
       )}
 
       {screen === 'preview-loading' && (
-        <PreviewLoadingScreen
-          photo={photo}
-          revisionId={revisionId}
-          selectedHairstyle={currentChosenHairstyle}
-          onComplete={(url) => {
-            setPreviewImageUrl(url)
-            setPreviewAvail(true)
-            setPreviewError(null)
-            setPreviewMode('possible')
-            setScreen('preview')
-          }}
-          onFail={(errorMsg) => {
-            setPreviewImageUrl(null)
-            setPreviewAvail(false)
-            setPreviewError(errorMsg || null)
-            setScreen('preview-failure')
-          }}
-        />
+        currentChosenHairstyle ? (
+          <PreviewLoadingScreen
+            photo={photo}
+            revisionId={revisionId}
+            selectedHairstyle={currentChosenHairstyle}
+            onComplete={(url) => {
+              setPreviewImageUrl(url)
+              setPreviewAvail(true)
+              setPreviewError(null)
+              setPreviewMode('possible')
+              setScreen('preview')
+            }}
+            onFail={(errorMsg) => {
+              setPreviewImageUrl(null)
+              setPreviewAvail(false)
+              setPreviewError(errorMsg || null)
+              setScreen('preview-failure')
+            }}
+          />
+        ) : (
+          <RecommendationsUnavailableScreen onBack={() => setScreen('recommendations')} />
+        )
       )}
 
       {screen === 'preview-failure' && (
-        <PreviewFailureScreen
-          selectedHairstyle={currentChosenHairstyle}
-          errorMessage={previewError}
-          onRetry={() => {
-            setPreviewMode('original')
-            setPreviewError(null)
-            setScreen('preview-loading')
-          }}
-          onContinueWithout={() => {
-            setPreviewAvail(false)
-            setPreviewImageUrl(null)
-            setScreen('barber-brief')
-          }}
-          onBack={() => setScreen('recommendations')}
-        />
+        currentChosenHairstyle ? (
+          <PreviewFailureScreen
+            selectedHairstyle={currentChosenHairstyle}
+            errorMessage={previewError}
+            onRetry={() => {
+              setPreviewMode('original')
+              setPreviewError(null)
+              setScreen('preview-loading')
+            }}
+            onContinueWithout={() => {
+              setPreviewAvail(false)
+              setPreviewImageUrl(null)
+              setScreen('barber-brief')
+            }}
+            onBack={() => setScreen('recommendations')}
+          />
+        ) : (
+          <RecommendationsUnavailableScreen onBack={() => setScreen('recommendations')} />
+        )
       )}
 
       {screen === 'preview' && (
-        <PreviewScreen
-          photo={photo}
-          previewImageUrl={previewImageUrl}
-          selectedHairstyle={currentChosenHairstyle}
-          previewMode={previewMode}
-          setPreviewMode={setPreviewMode}
-          onContinue={() => setScreen('barber-brief')}
-          onRetry={() => {
-            setPreviewMode('original')
-            setPreviewError(null)
-            setScreen('preview-loading')
-          }}
-          onBack={() => setScreen('recommendations')}
-        />
+        currentChosenHairstyle ? (
+          <PreviewScreen
+            photo={photo}
+            previewImageUrl={previewImageUrl}
+            selectedHairstyle={currentChosenHairstyle}
+            previewMode={previewMode}
+            setPreviewMode={setPreviewMode}
+            onContinue={() => setScreen('barber-brief')}
+            onRetry={() => {
+              setPreviewMode('original')
+              setPreviewError(null)
+              setScreen('preview-loading')
+            }}
+            onBack={() => setScreen('recommendations')}
+          />
+        ) : (
+          <RecommendationsUnavailableScreen onBack={() => setScreen('recommendations')} />
+        )
       )}
 
       {screen === 'barber-brief' && (
-        <BarberBriefScreen
-          photo={photo}
-          previewImageUrl={previewImageUrl}
-          selectedHairstyle={currentChosenHairstyle}
-          previewAvail={previewAvail}
-          notes={briefNotes}
-          setNotes={setBriefNotes}
-          onSave={() => {
-            setSaveName(currentChosenHairstyle.name)
-            setScreen('save')
-          }}
-          onBack={() => setScreen(previewAvail ? 'preview' : 'recommendations')}
-        />
+        currentChosenHairstyle ? (
+          <BarberBriefScreen
+            photo={photo}
+            previewImageUrl={previewImageUrl}
+            selectedHairstyle={currentChosenHairstyle}
+            previewAvail={previewAvail}
+            notes={briefNotes}
+            setNotes={setBriefNotes}
+            onSave={() => {
+              setSaveName(currentChosenHairstyle.name)
+              setScreen('save')
+            }}
+            onBack={() => setScreen(previewAvail ? 'preview' : 'recommendations')}
+          />
+        ) : (
+          <RecommendationsUnavailableScreen onBack={() => setScreen('recommendations')} />
+        )
       )}
 
       {screen === 'save' && (
-        <SaveScreen
-          photo={photo}
-          previewImageUrl={previewImageUrl}
-          selectedHairstyle={currentChosenHairstyle}
-          name={saveName}
-          setName={setSaveName}
-          onSave={handleSave}
-          onFail={handleSaveFail}
-          onBack={() => setScreen('barber-brief')}
-        />
+        currentChosenHairstyle ? (
+          <SaveScreen
+            photo={photo}
+            previewImageUrl={previewImageUrl}
+            selectedHairstyle={currentChosenHairstyle}
+            name={saveName}
+            setName={setSaveName}
+            onSave={handleSave}
+            onFail={handleSaveFail}
+            onBack={() => setScreen('barber-brief')}
+          />
+        ) : (
+          <RecommendationsUnavailableScreen onBack={() => setScreen('recommendations')} />
+        )
       )}
 
       {screen === 'save-success' && (

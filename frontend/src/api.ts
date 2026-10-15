@@ -84,11 +84,19 @@ export async function analyzePhoto(revisionId: string): Promise<AnalyzeResponse>
   return data
 }
 
+export interface BackendReasonEvidenceItem {
+  attribute: string
+  value: string
+  source: ProvenanceSource
+  contribution: string
+}
+
 export interface BackendRecommendationItem {
   id: string
   name: string
   description: string
   reason: string
+  reasonEvidence?: BackendReasonEvidenceItem[]
   stylingEffort: 'low' | 'medium' | 'high'
   constraints: string[]
   isBestMatch: boolean

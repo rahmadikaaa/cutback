@@ -3,7 +3,7 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { revisions } from './state';
-import { saveRevision } from './firestoreDb';
+import { saveRevision, getOrHydrateRevision } from './firestoreDb';
 import { uploadPreviewImage } from './cloudStorage';
 import crypto from 'crypto';
 
@@ -23,7 +23,7 @@ export const previewFlow = ai.defineFlow({
     previewImageUrl: z.string().optional()
   })
 }, async (input) => {
-  const state = revisions.get(input.revisionId);
+  const state = await getOrHydrateRevision(input.revisionId);
   
   if (!state) {
     return { route: 'STALE' as const, message: 'Revision not found.' };
