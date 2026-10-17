@@ -372,13 +372,22 @@ function SimBadge({ label = 'Simulated AI' }: { label?: string }) {
   )
 }
 
-function BackBtn({ onBack }: { onBack: () => void }) {
+function BackBtn({ onBack, disabled = false }: { onBack: () => void; disabled?: boolean }) {
   return (
     <button
-      onClick={onBack}
+      onClick={disabled ? undefined : onBack}
+      disabled={disabled}
       aria-label="Go back"
-      className="flex items-center justify-center rounded-full flex-shrink-0 transition-all active:scale-90"
-      style={{ background: 'rgba(240,235,224,0.09)', width: 44, height: 44, border: '1px solid rgba(240,235,224,0.1)' }}
+      aria-disabled={disabled}
+      className={`flex items-center justify-center rounded-full flex-shrink-0 transition-all ${disabled ? 'opacity-30 cursor-not-allowed' : 'active:scale-90'}`}
+      style={{
+        background: 'rgba(240,235,224,0.09)',
+        width: 44,
+        height: 44,
+        border: '1px solid rgba(240,235,224,0.1)',
+        opacity: disabled ? 0.3 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
     >
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <path d="M12.5 5L7.5 10L12.5 15" stroke="#f0ebe0" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -467,30 +476,11 @@ function GhostBtn({
 
 function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircuts: () => void }) {
   const [phase, setPhase] = useState(0)
-  const [isJourneyMinimized, setIsJourneyMinimized] = useState(false)
-  const journeyRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const t = setInterval(() => setPhase(p => (p + 1) % 3), 2800)
     return () => clearInterval(t)
   }, [])
-
-  useEffect(() => {
-    if (isJourneyMinimized) return
-
-    function handleClickOutside(event: MouseEvent | TouchEvent) {
-      if (journeyRef.current && !journeyRef.current.contains(event.target as Node)) {
-        setIsJourneyMinimized(true)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('touchstart', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('touchstart', handleClickOutside)
-    }
-  }, [isJourneyMinimized])
 
   const transformWords = ['sharper', 'bolder', 'cleaner']
 
@@ -509,135 +499,6 @@ function HomeScreen({ onStart, onMyHaircuts }: { onStart: () => void; onMyHaircu
         <div>
           <p className="text-xs tracking-[0.26em] uppercase mb-3" style={{ color: '#c9a96e', letterSpacing: '0.22em' }}>Cutback</p>
         </div>
-
-        {/* Transformation journey */}
-        <aside
-          ref={journeyRef}
-          className={`absolute right-0 top-[162px] overflow-hidden rounded-l-xl border-l transition-[width] duration-[240ms] ease-out ${isJourneyMinimized ? 'w-[68px]' : 'w-[142px]'
-            }`}
-          aria-label="Transformation journey"
-          style={{
-            background: isJourneyMinimized ? 'transparent' : 'linear-gradient(90deg, rgba(8,12,20,0.5), rgba(8,12,20,0.86))',
-            borderColor: isJourneyMinimized ? 'transparent' : 'rgba(201,169,110,0.18)',
-            backdropFilter: isJourneyMinimized ? 'none' : 'blur(3px)',
-          }}
-        >
-          <button
-            type="button"
-            className={`block w-full ${isJourneyMinimized ? 'py-1' : 'px-3 pb-2 pt-3 text-left'}`}
-            onClick={() => {
-              if (isJourneyMinimized) {
-                setIsJourneyMinimized(false)
-              }
-            }}
-            aria-expanded={!isJourneyMinimized}
-            aria-label={isJourneyMinimized ? 'Expand Transformation Journey' : 'Transformation Journey'}
-          >
-            {isJourneyMinimized ? (
-              <span className="block w-full">
-                <span
-                  className="mb-2 block px-0.5 text-center text-[7.5px] font-medium uppercase leading-[1.25]"
-                  style={{
-                    color: 'rgba(240,235,224,0.65)',
-                    letterSpacing: '0.06em',
-                    textShadow: '0 1px 4px rgba(8,12,20,0.9)',
-                  }}
-                >
-                  Transformation
-                  <br />
-                  Journey
-                </span>
-                {[
-                  { number: '01', label: 'Discover' },
-                  { number: '02', label: 'Define' },
-                  { number: '03', label: 'Visualize' },
-                  { number: '04', label: 'Ready' },
-                ].map((step, i) => {
-                  const isActive = i === 0
-                  return (
-                    <span key={step.number} className="relative flex h-12 w-full flex-col items-center">
-                      <span
-                        className="relative z-10 flex h-5 w-5 items-center justify-center rounded-full text-[7px] font-semibold"
-                        style={{
-                          background: isActive ? '#c9a96e' : 'rgba(8,12,20,0.58)',
-                          border: isActive ? '1px solid #c9a96e' : '1px solid rgba(240,235,224,0.46)',
-                          color: isActive ? '#080c14' : 'rgba(240,235,224,0.7)',
-                          boxShadow: isActive ? '0 0 7px rgba(201,169,110,0.18)' : 'none',
-                        }}
-                      >
-                        {step.number}
-                      </span>
-                      <span
-                        className="relative z-10 mt-0.5 block text-center text-[10px] font-medium leading-4"
-                        style={{ color: '#f0ebe0', textShadow: '0 1px 5px rgba(8,12,20,0.9)' }}
-                      >
-                        {step.label}
-                      </span>
-                      {i < 3 && (
-                        <span
-                          className="absolute left-1/2 top-[38px] h-[10px] w-px -translate-x-1/2"
-                          style={{ background: 'rgba(240,235,224,0.32)' }}
-                          aria-hidden
-                        />
-                      )}
-                    </span>
-                  )
-                })}
-              </span>
-            ) : (
-              <span className="block w-[118px]">
-                <span
-                  className="mb-3 block text-[10px] font-medium uppercase leading-[1.35]"
-                  style={{ color: 'rgba(240,235,224,0.62)', letterSpacing: '0.16em' }}
-                >
-                  Transformation
-                  <br />
-                  Journey
-                </span>
-                <span className="block">
-                  {[
-                    { number: '01', label: 'Discover', detail: 'Upload & Analyse' },
-                    { number: '02', label: 'Define', detail: 'Recommend' },
-                    { number: '03', label: 'Visualize', detail: 'Preview' },
-                    { number: '04', label: 'Ready', detail: 'Brief' },
-                  ].map((step, i) => {
-                    const isActive = i === 0
-                    return (
-                      <span key={step.number} className="relative flex min-h-[44px] gap-2.5">
-                        <span className="relative flex w-[22px] flex-shrink-0 justify-center">
-                          <span
-                            className="relative z-10 flex h-[22px] w-[22px] items-center justify-center rounded-full text-[8px] font-semibold"
-                            style={{
-                              background: isActive ? '#c9a96e' : 'rgba(8,12,20,0.34)',
-                              border: isActive ? '1px solid #c9a96e' : '1px solid rgba(240,235,224,0.4)',
-                              color: isActive ? '#080c14' : 'rgba(240,235,224,0.62)',
-                              boxShadow: isActive ? '0 0 8px rgba(201,169,110,0.2)' : 'none',
-                            }}
-                          >
-                            {step.number}
-                          </span>
-                          {i < 3 && (
-                            <span
-                              className="absolute top-[22px] h-[22px] w-px"
-                              style={{ background: 'rgba(240,235,224,0.24)' }}
-                              aria-hidden
-                            />
-                          )}
-                        </span>
-                        <span className="-mt-0.5 block min-w-0">
-                          <span className="block text-xs font-semibold leading-[17px]" style={{ color: '#f0ebe0' }}>{step.label}</span>
-                          <span className="block whitespace-nowrap text-[10px] leading-[15px]" style={{ color: 'rgba(240,235,224,0.58)' }}>
-                            {step.detail}
-                          </span>
-                        </span>
-                      </span>
-                    )
-                  })}
-                </span>
-              </span>
-            )}
-          </button>
-        </aside>
 
         {/* Hero */}
         <div>
@@ -1033,8 +894,8 @@ function AnalysisLoadingScreen({
                     </svg>
                   ) : isActive ? (
                     <div className="relative w-3.5 h-3.5 flex items-center justify-center">
-                       <div className="absolute w-full h-full rounded-full" style={{ background: 'rgba(201,169,110,0.25)', animation: 'dotPulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                       <div className="absolute w-1.5 h-1.5 rounded-full" style={{ background: '#c9a96e' }} />
+                      <div className="absolute w-full h-full rounded-full" style={{ background: 'rgba(201,169,110,0.25)', animation: 'dotPulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                      <div className="absolute w-1.5 h-1.5 rounded-full" style={{ background: '#c9a96e' }} />
                     </div>
                   ) : (
                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--muted-foreground)' }} />
@@ -1127,7 +988,7 @@ function AnalysisResultsScreen({
         <BackBtn onBack={onBack} />
         <div className="flex-1 flex flex-col items-center justify-center text-center pt-8">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)' }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M14 9v6M14 19v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round"/></svg>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" strokeDasharray="3 3" /><path d="M14 9v6M14 19v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round" /></svg>
           </div>
           <h2 className="font-display text-2xl mb-2" style={{ color: 'var(--foreground)' }}>No Analysis Available</h2>
           <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--muted-foreground)', maxWidth: 280 }}>
@@ -2158,6 +2019,8 @@ function BarberBriefScreen({
   setNotes,
   onSave,
   onBack,
+  isSaved = false,
+  onHome,
 }: {
   photo: string
   previewImageUrl: string | null
@@ -2167,9 +2030,10 @@ function BarberBriefScreen({
   setNotes: (s: string) => void
   onSave: () => void
   onBack: () => void
+  isSaved?: boolean
+  onHome?: () => void
 }) {
   const rec = selectedHairstyle
-  const [briefExpanded, setBriefExpanded] = useState(false)
   const [showPresentationModal, setShowPresentationModal] = useState(false)
   const UNKNOWNS = ['Exact fade height (confirm with barber)', 'Parting preference if applicable']
 
@@ -2202,22 +2066,24 @@ function BarberBriefScreen({
         className="flex items-center gap-3 px-5 pt-12 pb-4 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
-        <BackBtn onBack={onBack} />
+        <BackBtn onBack={onBack} disabled={isSaved} />
         <div className="flex-1">
           <p className="uppercase" style={{ color: '#c9a96e', fontSize: 9, letterSpacing: '0.14em' }}>Barber Brief</p>
           <h2 className="font-display text-2xl leading-tight" style={{ color: 'var(--foreground)' }}>{rec.name}</h2>
         </div>
-        <button
-          onClick={onSave}
-          className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all active:scale-95"
-          style={{ background: 'var(--secondary)', color: 'var(--secondary-foreground)', border: '1px solid var(--border)', minHeight: 44 }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M11 12.5H3a1 1 0 01-1-1V2.5a1 1 0 011-1h6.5L12 4v7.5a1 1 0 01-1 1z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
-            <path d="M9.5 1.5v3H4v-3M4.5 8h5M4.5 10h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-          </svg>
-          Save
-        </button>
+        {!isSaved && (
+          <button
+            onClick={onSave}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all active:scale-95"
+            style={{ background: 'var(--secondary)', color: 'var(--secondary-foreground)', border: '1px solid var(--border)', minHeight: 44 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M11 12.5H3a1 1 0 01-1-1V2.5a1 1 0 011-1h6.5L12 4v7.5a1 1 0 01-1 1z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+              <path d="M9.5 1.5v3H4v-3M4.5 8h5M4.5 10h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+            </svg>
+            Save
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto pb-6">
@@ -2269,59 +2135,23 @@ function BarberBriefScreen({
           ))}
         </div>
 
-        {/* Notes */}
-        <div className="px-5 pt-3 pb-2" style={{ borderTop: '1px solid var(--border)', marginTop: 4 }}>
-          <p className="uppercase mb-2 pt-3" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.1em' }}>Notes</p>
-          <textarea
-            value={notes}
-            onChange={e => { if (e.target.value.length <= 500) setNotes(e.target.value) }}
-            placeholder="Add anything for your barber…"
-            rows={2}
-            className="w-full rounded-lg p-3 text-sm resize-none"
-            style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', fontFamily: 'var(--font-sans)' }}
-          />
-        </div>
-
-        {/* Confirm with barber */}
-        <div className="mx-5 rounded-xl p-4 mt-2 mb-5" style={{ background: 'rgba(201,169,110,0.07)', border: '1px solid rgba(201,169,110,0.2)' }}>
-          <p className="uppercase mb-2" style={{ color: '#c9a96e', fontSize: 9, letterSpacing: '0.12em' }}>Confirm with your barber</p>
-          {UNKNOWNS.map(u => (
-            <p key={u} className="text-sm mb-1" style={{ color: 'var(--secondary-foreground)' }}>· {u}</p>
-          ))}
-        </div>
-
-        {/* Brief expand toggle — anatomy */}
-        <div className="mx-5 mb-5">
-          <button
-            onClick={() => setBriefExpanded(!briefExpanded)}
-            className="w-full flex items-center justify-between py-3 px-4 rounded-xl text-sm font-medium transition-all active:scale-[0.99]"
-            style={{ background: 'var(--secondary)', color: 'var(--secondary-foreground)', border: '1px solid var(--border)', minHeight: 48 }}
-          >
-            <span>Haircut anatomy</span>
-            <svg
-              width="16" height="16" viewBox="0 0 16 16" fill="none"
-              style={{ transform: briefExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 200ms ease' }}
-            >
-              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          {briefExpanded && (
-            <div className="mt-2 rounded-xl p-4 space-y-2" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-              {[
-                { label: 'Style family', value: rec.name },
-                ...rows,
-              ].map(r => (
-                <div key={r.label} className="flex gap-3">
-                  <span className="uppercase flex-shrink-0 w-24" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.1em', paddingTop: 2 }}>{r.label}</span>
-                  <span className="text-xs" style={{ color: 'var(--secondary-foreground)' }}>{r.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Notes (hidden from rendering per requirements while keeping code, state, and props intact) */}
+        {false && (
+          <div className="px-5 pt-3 pb-2" style={{ borderTop: '1px solid var(--border)', marginTop: 4 }}>
+            <p className="uppercase mb-2 pt-3" style={{ color: 'var(--muted-foreground)', fontSize: 9, letterSpacing: '0.1em' }}>Notes</p>
+            <textarea
+              value={notes}
+              onChange={e => { if (e.target.value.length <= 500) setNotes(e.target.value) }}
+              placeholder="Add anything for your barber…"
+              rows={2}
+              className="w-full rounded-lg p-3 text-sm resize-none"
+              style={{ background: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)', fontFamily: 'var(--font-sans)' }}
+            />
+          </div>
+        )}
 
         {/* Primary CTA — Show My Barber */}
-        <div className="px-5">
+        <div className="px-5 mt-4">
           <button
             className="w-full py-4 rounded-xl font-medium text-base transition-all active:scale-[0.98] mb-3"
             style={{ background: '#c9a96e', color: '#080c14', minHeight: 56, fontFamily: 'var(--font-sans)' }}
@@ -2329,7 +2159,10 @@ function BarberBriefScreen({
           >
             Show My Barber
           </button>
-          <GhostBtn onClick={onSave}>Save This Haircut</GhostBtn>
+          {!isSaved && <GhostBtn onClick={onSave}>Save This Haircut</GhostBtn>}
+          {isSaved && onHome && (
+            <GhostBtn onClick={onHome}>Back to Home</GhostBtn>
+          )}
         </div>
 
         {/* Barber Presentation Mode Modal (DEF-003 Option A) */}
@@ -2658,24 +2491,24 @@ function MyHaircutsScreen({
             {savedHaircuts.map(hc => {
               const style: HairstyleItem = hc.rec ??
                 (hc.hairstyleId !== undefined ? DEMO_FIXTURE_HAIRSTYLES.find(h => h.id === hc.hairstyleId) : undefined) ??
-                {
-                  id: hc.hairstyleId ?? 0,
-                  backendId: hc.backendId,
-                  name: hc.hairstyleName || hc.name || 'Saved Hairstyle',
-                  description: 'Saved hairstyle brief',
-                  reason: 'Saved custom recommendation',
-                  reasonEvidence: [],
-                  effort: 'Medium',
-                  effortDetail: 'Custom styling',
-                  limitation: 'Consult barber for specifics',
-                  bestMatch: false,
-                  previewPortrait: portrait1,
-                  top: 'Custom length',
-                  sides: 'Tapered sides',
-                  back: 'Tapered neckline',
-                  fade: 'Custom taper',
-                  styling: 'Style as desired',
-                }
+              {
+                id: hc.hairstyleId ?? 0,
+                backendId: hc.backendId,
+                name: hc.hairstyleName || hc.name || 'Saved Hairstyle',
+                description: 'Saved hairstyle brief',
+                reason: 'Saved custom recommendation',
+                reasonEvidence: [],
+                effort: 'Medium',
+                effortDetail: 'Custom styling',
+                limitation: 'Consult barber for specifics',
+                bestMatch: false,
+                previewPortrait: portrait1,
+                top: 'Custom length',
+                sides: 'Tapered sides',
+                back: 'Tapered neckline',
+                fade: 'Custom taper',
+                styling: 'Style as desired',
+              }
               return (
                 <div
                   key={hc.id}
@@ -2898,7 +2731,7 @@ function RecommendationsUnavailableScreen({ onBack }: { onBack: () => void }) {
       <BackBtn onBack={onBack} />
       <div className="flex-1 flex flex-col items-center justify-center text-center pt-8">
         <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)' }}>
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M14 9v6M14 19v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round"/></svg>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="11" stroke="#c9a96e" strokeWidth="1.5" strokeDasharray="3 3" /><path d="M14 9v6M14 19v.5" stroke="#c9a96e" strokeWidth="2" strokeLinecap="round" /></svg>
         </div>
         <h2 className="font-display text-2xl mb-2" style={{ color: 'var(--foreground)' }}>No Haircut Selected</h2>
         <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--muted-foreground)', maxWidth: 280 }}>
@@ -2960,6 +2793,7 @@ export default function App() {
   const [previewError, setPreviewError] = useState<string | null>(null)
 
   const [briefNotes, setBriefNotes] = useState('')
+  const [briefOrigin, setBriefOrigin] = useState<'generation' | 'saved'>('generation')
 
   const [saveName, setSaveName] = useState('')
 
@@ -3056,6 +2890,7 @@ export default function App() {
       setChosenRec(hc.hairstyleId ?? 0);
     }
 
+    setBriefOrigin('saved')
     setScreen('barber-brief')
   }
 
@@ -3096,6 +2931,7 @@ export default function App() {
     }
 
     setBriefNotes('')
+    setBriefOrigin('saved')
     setScreen('barber-brief')
   }
 
@@ -3165,6 +3001,7 @@ export default function App() {
     setPreviewError(null)
     setPreviewMode('original')
     setBriefNotes('')
+    setBriefOrigin('generation')
     setSaveName('')
   }
 
@@ -3323,6 +3160,7 @@ export default function App() {
             onContinueWithout={() => {
               setPreviewAvail(false)
               setPreviewImageUrl(null)
+              setBriefOrigin('generation')
               setScreen('barber-brief')
             }}
             onBack={() => setScreen('recommendations')}
@@ -3340,7 +3178,10 @@ export default function App() {
             selectedHairstyle={currentChosenHairstyle}
             previewMode={previewMode}
             setPreviewMode={setPreviewMode}
-            onContinue={() => setScreen('barber-brief')}
+            onContinue={() => {
+              setBriefOrigin('generation')
+              setScreen('barber-brief')
+            }}
             onRetry={() => {
               setPreviewMode('original')
               setPreviewError(null)
@@ -3366,7 +3207,15 @@ export default function App() {
               setSaveName(currentChosenHairstyle.name)
               setScreen('save')
             }}
-            onBack={() => setScreen(previewAvail ? 'preview' : 'recommendations')}
+            onBack={() => {
+              if (briefOrigin === 'saved') return
+              setScreen(previewAvail ? 'preview' : 'recommendations')
+            }}
+            isSaved={briefOrigin === 'saved'}
+            onHome={() => {
+              resetFlow()
+              setScreen('home')
+            }}
           />
         ) : (
           <RecommendationsUnavailableScreen onBack={() => setScreen('recommendations')} />
